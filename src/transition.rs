@@ -6,7 +6,7 @@ pub trait Transition<Source, Ctx, Event, Target> {
 
 impl<Source, Ctx, Event, Target, F> Transition<Source, Ctx, Event, Target> for F
 where
-    F: Fn(&mut Source, &mut Ctx, Event, PhantomData<Target>) -> Event
+    F: Fn(&mut Source, &mut Ctx, Event, PhantomData<Target>) -> Event,
 {
     fn make_transition(&self, source: &mut Source, ctx: &mut Ctx, event: Event) -> Event {
         self(source, ctx, event, PhantomData)

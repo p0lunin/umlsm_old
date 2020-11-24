@@ -1,4 +1,4 @@
-use frunk::{HNil, HCons};
+use frunk::{HCons, HNil};
 
 pub trait Guard<Input> {
     fn check(&self, input: &Input) -> bool;
@@ -6,7 +6,7 @@ pub trait Guard<Input> {
 
 impl<Input, F> Guard<Input> for F
 where
-    F: Fn(&Input) -> bool
+    F: Fn(&Input) -> bool,
 {
     fn check(&self, input: &Input) -> bool {
         self(input)

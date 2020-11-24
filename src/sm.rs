@@ -1,94 +1,94 @@
-use frunk::{HNil, HCons};
-use frunk::hlist::{HList, Selector};
-use std::marker::PhantomData;
-use crate::vertex::{InitialPseudostate, ExitVertex, EntryVertex};
-use crate::transition::Transition;
 use crate::guard::Guard;
+use crate::transition::Transition;
+use crate::vertex::InitialPseudostate;
+use frunk::hlist::{HList, Selector};
+use frunk::{HCons, HNil};
+use std::marker::PhantomData;
 
-pub struct StateMachine<Current, State, Vertexes, Transitions> {
-    current: PhantomData<Current>,
-    state: State,
-    vertexes: Vertexes,
-    transitions: Transitions,
+pub struct StateMachine<Current, State, Vertexes, Transitions, TransWithGuards> {
+    pub state: State,
+    pub vertexes: Vertexes,
+    pub trans_with_guards: TransWithGuards,
+    pub phantom: PhantomData<(Current, Transitions)>,
 }
 
-impl<State> StateMachine<InitialPseudostate, State, HNil, HNil> {
+impl<State> StateMachine<InitialPseudostate, State, HNil, HNil, HNil> {
     pub fn new(state: State) -> Self {
         Self {
-            current: PhantomData,
             state,
             vertexes: HNil,
-            transitions: HNil
+            trans_with_guards: HNil,
+            phantom: PhantomData,
         }
     }
 }
-impl<C, State, Vertexes: HList, Transitions> StateMachine<C, State, Vertexes, Transitions> {
-    pub fn add_initial<V>(self, vertex: V) -> StateMachine<V, State, HCons<V, Vertexes>, Transitions> {
-        let StateMachine { vertexes, transitions, state, .. } = self;
+impl<C, State, Vertexes: HList, Transitions, TransWithGuards>
+    StateMachine<C, State, Vertexes, Transitions, TransWithGuards>
+{
+    pub fn add_initial<V>(
+        self,
+        vertex: V,
+    ) -> StateMachine<V, State, HCons<V, Vertexes>, Transitions, TransWithGuards> {
+        let StateMachine {
+            vertexes,
+            trans_with_guards,
+            state,
+            ..
+        } = self;
         StateMachine {
-            current: PhantomData,
             state,
             vertexes: vertexes.prepend(vertex),
-            transitions
+            trans_with_guards,
+            phantom: PhantomData,
         }
     }
-    pub fn add_vertex<V>(self, vertex: V) -> StateMachine<C, State, HCons<V, Vertexes>, Transitions> {
-        let StateMachine { vertexes, transitions, state, .. } = self;
+    pub fn add_vertex<V>(
+        self,
+        vertex: V,
+    ) -> StateMachine<C, State, HCons<V, Vertexes>, Transitions, TransWithGuards> {
+        let StateMachine {
+            vertexes,
+            trans_with_guards,
+            state,
+            ..
+        } = self;
         StateMachine {
-            current: PhantomData,
             state,
             vertexes: vertexes.prepend(vertex),
-            transitions
+            trans_with_guards,
+            phantom: PhantomData,
         }
     }
 }
-impl<C, State, Vertexes, Transitions: HList> StateMachine<C, State, Vertexes, Transitions> {
-    pub fn add_transition<T, G, S, E, Tar, SIdx, TarIdx>(self, transition: T, guard: G) -> StateMachine<C, State, Vertexes, HCons<(T, G), Transitions>>
+impl<C, State, Vertexes, Transitions, TransWithGuards: HList>
+    StateMachine<C, State, Vertexes, Transitions, TransWithGuards>
+{
+    pub fn add_transition<T, G, S, E, Tar, SIdx, TarIdx>(
+        self,
+        transition: T,
+        guard: G,
+    ) -> StateMachine<C, State, Vertexes, HCons<T, Transitions>, HCons<(T, G), TransWithGuards>>
     where
         Vertexes: Selector<S, SIdx> + Selector<Tar, TarIdx>,
         T: Transition<S, State, E, Tar>,
         G: Guard<E>,
     {
-        let StateMachine { vertexes, transitions, state, .. } = self;
+        let StateMachine {
+            vertexes,
+            trans_with_guards,
+            state,
+            ..
+        } = self;
         StateMachine {
-            current: PhantomData,
             state,
             vertexes,
-            transitions: transitions.prepend((transition, guard))
+            trans_with_guards: trans_with_guards.prepend((transition, guard)),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<C, State, Vertexes, Transitions> StateMachine<C, State, Vertexes, Transitions> {
-    pub fn transition<E, T, CIdx, TIdx, Trans, G, TransIdx>(mut self, event: E) -> Result<StateMachine<T, State, Vertexes, Transitions>, Self>
-    where
-        Vertexes: Selector<C, CIdx> + Selector<T, TIdx>,
-        Transitions: Selector<(Trans, G), TransIdx>,
-        Trans: Transition<C, State, E, T>,
-        C: ExitVertex,
-        T: EntryVertex<E>,
-        G: Guard<E>,
-    {
-        let current: &mut C = self.vertexes.get_mut();
-        let (trans, guard) = self.transitions.get_mut();
-
-        if guard.check(&event) {
-            current.exit();
-            let event = trans.make_transition(current, &mut self.state, event);
-
-            let target: &mut T = self.vertexes.get_mut();
-            target.entry(event);
-
-            let StateMachine { state, vertexes, transitions, .. } = self;
-            Ok(StateMachine {
-                current: PhantomData,
-                state,
-                vertexes,
-                transitions,
-            })
-        }
-        else {
-            Err(self)
-        }
-    }
+pub trait ProcessEvent<E, Other>: Sized {
+    type ResultOk;
+    fn process(self, event: E) -> Result<Self::ResultOk, Self>;
 }

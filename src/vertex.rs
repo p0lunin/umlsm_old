@@ -9,21 +9,15 @@ pub trait ExitVertex {
 pub struct InitialPseudostate;
 
 impl EntryVertex<()> for InitialPseudostate {
-    fn entry(&mut self, _: ()) {
-
-    }
+    fn entry(&mut self, _: ()) {}
 }
 
 impl ExitVertex for InitialPseudostate {
-    fn exit(&mut self) {
-
-    }
+    fn exit(&mut self) {}
 }
 
 pub struct TerminatePseudostate;
 
 impl EntryVertex<()> for TerminatePseudostate {
-    fn entry(&mut self, _: ()) {
-
-    }
+    fn entry(&mut self, _: ()) {}
 }
