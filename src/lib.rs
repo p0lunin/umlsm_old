@@ -1,4 +1,5 @@
 mod guard;
+mod hmap;
 mod sm;
 mod transition;
 mod vertex;
@@ -6,10 +7,69 @@ mod vertex;
 pub use {
     guard::Guard,
     sm::StateMachine,
-    transition::Transition,
-    vertex::{EntryVertex, ExitVertex, InitialPseudostate, TerminatePseudostate},
+    transition::Action,
+    vertex::{EntryVertex, ExitVertex},
 };
 
+#[cfg(test)]
+mod tests {
+    use crate::hmap::HMap;
+    use crate::sm::StateMachine;
+    use crate::transition::{Action, ITransition};
+    use crate::vertex::{EntryVertex, ExitVertex};
+    use crate::Guard;
+    use frunk::coproduct::CNil;
+    use frunk::hlist::Selector;
+    use frunk::indices::{Here, There};
+    use frunk::Coproduct;
+    use std::collections::HashMap;
+    use std::marker::PhantomData;
+    use std::pin::Pin;
+
+    struct Locked;
+    impl<E> EntryVertex<E> for Locked {
+        fn entry(&mut self, _: E) {}
+    }
+    impl ExitVertex for Locked {
+        fn exit(&mut self) {}
+    }
+    struct Unlocked;
+    impl<E> EntryVertex<E> for Unlocked {
+        fn entry(&mut self, _: E) {}
+    }
+    impl ExitVertex for Unlocked {
+        fn exit(&mut self) {}
+    }
+
+    struct Push;
+
+    struct Beep;
+    impl Action<Locked, (), Push> for Beep {
+        fn trigger(&self, _: &mut Locked, _: &mut (), event: &Push) {
+            println!("beep!");
+        }
+    }
+
+    #[test]
+    fn test() {
+        let sm = StateMachine::new(Locked {}, ())
+            .add_vertex(Unlocked {})
+            .add_transition(Beep, frunk::hlist![], PhantomData::<Unlocked>);
+
+        let mut sm = sm;
+
+        /*ITransition::<
+            _, //Coproduct<PhantomData<Unlocked>, Coproduct<PhantomData<Locked>, CNil>>,
+            (),
+            Push,
+            _, //Coproduct<PhantomData<Unlocked>, Coproduct<PhantomData<Locked>, CNil>>,
+            _,
+            _
+        >::process(&mut sm.transitions.hlist, &mut sm.current, &mut sm.state, Push);*/
+        sm.process::<Push, _>(Push).ok().unwrap();
+    }
+}
+/*
 #[cfg(test)]
 mod tests {
     use crate::sm::{ProcessEvent, StateMachine};
@@ -68,12 +128,14 @@ mod tests {
                 target.entry(event);
 
                 let StateMachine {
+                    current,
                     state,
                     vertexes,
                     trans_with_guards,
                     ..
                 } = self;
                 Ok(StateMachine {
+                    current,
                     state,
                     vertexes,
                     trans_with_guards,
@@ -103,7 +165,7 @@ mod tests {
         C: ExitVertex,
         G: Guard<Coin>,
     {
-        type ResultOk = StateMachine<Unlocked, State, Vertexes, Transitions, TransWithGuards>;
+        type ResultOk = StateMachine<C, State, Vertexes, Transitions, TransWithGuards>;
 
         fn process(mut self, event: Coin) -> Result<Self::ResultOk, Self> {
             let current: &mut C = self.vertexes.get_mut();
@@ -117,12 +179,14 @@ mod tests {
                 target.entry(event);
 
                 let StateMachine {
+                    current,
                     state,
                     vertexes,
                     trans_with_guards,
                     ..
                 } = self;
                 Ok(StateMachine {
+                    current,
                     state,
                     vertexes,
                     trans_with_guards,
@@ -199,10 +263,11 @@ mod tests {
                 frunk::hlist![],
             );
 
-        let sm: StateMachine<Locked, _, _, _, _> = sm;
+        let sm = sm;
 
-        let sm: StateMachine<Unlocked, _, _, _, _> = sm.process(Coin).ok().unwrap();
+        let sm = sm.process(Coin).ok().unwrap();
 
-        let _: StateMachine<Locked, _, _, _, _> = sm.process(Push).ok().unwrap();
+        let _ = sm.process(Push).ok().unwrap();
     }
 }
+*/
