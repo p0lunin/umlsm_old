@@ -2,6 +2,7 @@ use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapGetKeyByCoprod, HMapNil};
 use crate::transition::{Action, ITransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData};
+use crate::vertex::VertexHList;
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::HList;
 use frunk::{Coproduct, HCons, HNil};
@@ -115,7 +116,7 @@ pub trait ProcessEvent<E, Other> {
 impl<C, State, Transitions, E, OtherTR> ProcessEvent<E, OtherTR>
     for StateMachine<C, State, HMap<Transitions>>
 where
-    Transitions: ITransition<C, State, E, C, OtherTR>,
+    Transitions: ITransition<C, State, E, C, OtherTR> + VertexHList<C>,
 {
     fn process(&mut self, event: E) -> Result<(), ()> {
         let result = self
@@ -124,7 +125,8 @@ where
             .process(&mut self.current, &mut self.state, event)
             .map_err(|_| ());
         match result {
-            Ok(target) => {
+            Ok(mut target) => {
+                self.transitions.hlist.entry(&mut target);
                 self.current = target;
                 Ok(())
             }

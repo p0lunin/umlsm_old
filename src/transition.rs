@@ -1,5 +1,5 @@
 use crate::hmap::HMapNil;
-use crate::Guard;
+use crate::{Guard, Vertex};
 use frunk::coproduct::{CNil, CoproductEmbedder};
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
@@ -47,6 +47,7 @@ impl<Source, Ctx, Event, ActionT, GuardT, Target>
     ITransition<Source, Ctx, Event, Coproduct<PhantomData<Target>, CNil>, ()>
     for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>>
 where
+    Source: Vertex,
     ActionT: Action<Source, Ctx, Event>,
     GuardT: Guard<Event>,
 {
@@ -57,6 +58,7 @@ where
         event: Event,
     ) -> Result<Coproduct<PhantomData<Target>, CNil>, ()> {
         if self.guard.check(&event) {
+            source.exit();
             self.action.trigger(source, ctx, &event);
             Ok(Coproduct::inject(PhantomData))
         } else {
@@ -104,31 +106,7 @@ where
         }
     }
 }
-/*
-CoprodInjector<PhantomData<Coproduct<PhantomData<Unlocked>, Coproduct<PhantomData<Locked>, CNil>>>, There<_>>` for
-    `Coproduct<PhantomData<tests::Locked>, frunk::coproduct::CNil>`
 
-Transition<Locked, (), Push, Beep, HNil, PhantomData<Unlocked>>:
-    ITransition<Locked, (), Push, PhantomData<Unlocked>, _>` is not satisfied
-
-
-impl<Source, Trans, Ctx, Event, Other, Idx, TargetConvert>
-    ITransition<Coproduct<PhantomData<Source>, CNil>, Ctx, Event, Coproduct<PhantomData<Source>, CNil>, There<Here>, (Other, Idx, TargetConvert, (), (), ())>
-    for HCons<(Source, Trans), HNil>
-{
-    fn process(
-        &mut self,
-        source: &mut Coproduct<PhantomData<Source>, CNil>,
-        ctx: &mut Ctx,
-        event: Event,
-    ) -> Result<Event, Event> {
-        ITransition::<_, _, _, Coproduct<PhantomData<Source>, CNil>, _, _>::process(&mut HNil, source, ctx, event)
-    }
-
-    fn target(&mut self, source: &mut Coproduct<PhantomData<Source>, CNil>) -> Coproduct<PhantomData<Source>, CNil> {
-        ITransition::<_, Ctx, Event, _, _, _>::target(&mut HNil, &mut self.head.0)
-    }
-}*/
 impl<Ctx, Event, Target> ITransition<CNil, Ctx, Event, Target, ()> for HMapNil {
     fn process(&mut self, _: &mut CNil, _: &mut Ctx, _: Event) -> Result<Target, ()> {
         Err(())
