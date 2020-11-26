@@ -1,7 +1,8 @@
+use crate::hmap::HMapNil;
 use crate::Guard;
-use frunk::coproduct::{CNil, CoprodInjector, CoproductEmbedder};
-use frunk::indices::{Here, There};
+use frunk::coproduct::{CNil, CoproductEmbedder};
 use frunk::{Coproduct, HCons, HNil};
+use std::any::TypeId;
 use std::marker::PhantomData;
 
 pub trait Action<Source, Ctx, Event> {
@@ -38,14 +39,12 @@ where
     }
 }
 
-pub trait ITransition<Source, Ctx, Event, Target, Index, Other> {
-    fn process(&mut self, source: &mut Source, ctx: &mut Ctx, event: Event)
-        -> Result<Event, Event>;
-    fn target(&mut self, source: &mut Source) -> Target;
+pub trait ITransition<Source, Ctx, Event, Target, Other> {
+    fn process(&mut self, source: &mut Source, ctx: &mut Ctx, event: Event) -> Result<Target, ()>;
 }
 
 impl<Source, Ctx, Event, ActionT, GuardT, Target>
-    ITransition<Source, Ctx, Event, PhantomData<Target>, Here, ()>
+    ITransition<Source, Ctx, Event, Coproduct<PhantomData<Target>, CNil>, ()>
     for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>>
 where
     ActionT: Action<Source, Ctx, Event>,
@@ -56,79 +55,66 @@ where
         source: &mut Source,
         ctx: &mut Ctx,
         event: Event,
-    ) -> Result<Event, Event> {
+    ) -> Result<Coproduct<PhantomData<Target>, CNil>, ()> {
         if self.guard.check(&event) {
             self.action.trigger(source, ctx, &event);
-            Ok(event)
+            Ok(Coproduct::inject(PhantomData))
         } else {
-            Err(event)
+            Err(())
         }
     }
+}
 
-    #[inline]
-    fn target(&mut self, _: &mut Source) -> PhantomData<Target> {
-        PhantomData
+impl<Source, Ctx, Target, Event> ITransition<Source, Ctx, Event, Target, ()> for HNil {
+    fn process(&mut self, _: &mut Source, _: &mut Ctx, _: Event) -> Result<Target, ()> {
+        Err(())
     }
 }
 
-impl<Source, Ctx, Event> ITransition<Source, Ctx, Event, Source, Here, ()> for HNil {
-    fn process(&mut self, _: &mut Source, _: &mut Ctx, event: Event) -> Result<Event, Event> {
-        Err(event)
-    }
-
-    fn target(&mut self, _: &mut Source) -> Source {
-        // Because we always return Err from process, we never called target
-        unreachable!()
-    }
-}
-
-impl<Source, Ctx, Event, TargetUnit, Target, CoprodRest, Trans, Rest, Other, Indices>
-    ITransition<Source, Ctx, Event, Target, Here, (TargetUnit, CoprodRest, Other, Indices)>
-    for HCons<Trans, Rest>
+impl<
+        Source,
+        Ctx,
+        Event,
+        TargetUnit,
+        Target,
+        Rest,
+        Indices,
+        Other,
+        Action,
+        Guard,
+        TransEvent,
+        OtherTrans,
+    > ITransition<Source, Ctx, Event, Target, (TargetUnit, Indices, Other, OtherTrans)>
+    for HCons<Transition<Source, Ctx, TransEvent, Action, Guard, PhantomData<TargetUnit>>, Rest>
 where
-    Trans: ITransition<Source, Ctx, Event, PhantomData<TargetUnit>, Here, Other>,
-    Target: CoprodInjector<PhantomData<TargetUnit>, Indices>,
+    Transition<Source, Ctx, TransEvent, Action, Guard, PhantomData<TargetUnit>>:
+        ITransition<Source, Ctx, TransEvent, Coproduct<PhantomData<TargetUnit>, CNil>, OtherTrans>,
+    Coproduct<PhantomData<TargetUnit>, CNil>: CoproductEmbedder<Target, Indices>,
+    Rest: ITransition<Source, Ctx, Event, Target, Other>,
+    Event: 'static,
+    TransEvent: 'static,
 {
-    fn process(
-        &mut self,
-        source: &mut Source,
-        ctx: &mut Ctx,
-        event: Event,
-    ) -> Result<Event, Event> {
-        self.head.process(source, ctx, event)
-    }
-
-    fn target(&mut self, source: &mut Source) -> Target {
-        Target::inject(self.head.target(source))
+    fn process(&mut self, source: &mut Source, ctx: &mut Ctx, event: Event) -> Result<Target, ()> {
+        if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
+            self.head
+                .process(source, ctx, unsafe { std::mem::transmute_copy(&event) })
+                .map(|t| t.embed())
+        } else {
+            self.tail.process(source, ctx, event)
+        }
     }
 }
+/*
+CoprodInjector<PhantomData<Coproduct<PhantomData<Unlocked>, Coproduct<PhantomData<Locked>, CNil>>>, There<_>>` for
+    `Coproduct<PhantomData<tests::Locked>, frunk::coproduct::CNil>`
 
-impl<Source, Ctx, Event, Target, CoprodRest, Trans, InnerTarget, Rest, Other, Idx, Indices>
-    ITransition<Source, Ctx, Event, Target, There<Idx>, (CoprodRest, Other, Indices, InnerTarget)>
-    for HCons<Trans, Rest>
-where
-    Rest: ITransition<Source, Ctx, Event, PhantomData<InnerTarget>, Idx, Other>,
-    Target: CoprodInjector<PhantomData<InnerTarget>, Indices>,
-{
-    fn process(
-        &mut self,
-        source: &mut Source,
-        ctx: &mut Ctx,
-        event: Event,
-    ) -> Result<Event, Event> {
-        self.tail.process(source, ctx, event)
-    }
+Transition<Locked, (), Push, Beep, HNil, PhantomData<Unlocked>>:
+    ITransition<Locked, (), Push, PhantomData<Unlocked>, _>` is not satisfied
 
-    fn target(&mut self, source: &mut Source) -> Target {
-        Target::inject(self.tail.target(source))
-    }
-}
 
-impl<Source, Trans, Ctx, Event, Target, Other, Idx>
-    ITransition<Coproduct<PhantomData<Source>, CNil>, Ctx, Event, Target, Here, (Other, Idx)>
+impl<Source, Trans, Ctx, Event, Other, Idx, TargetConvert>
+    ITransition<Coproduct<PhantomData<Source>, CNil>, Ctx, Event, Coproduct<PhantomData<Source>, CNil>, There<Here>, (Other, Idx, TargetConvert, (), (), ())>
     for HCons<(Source, Trans), HNil>
-where
-    Trans: ITransition<Source, Ctx, Event, Target, Idx, Other>,
 {
     fn process(
         &mut self,
@@ -136,81 +122,43 @@ where
         ctx: &mut Ctx,
         event: Event,
     ) -> Result<Event, Event> {
-        match source {
-            Coproduct::Inl(_) => self.head.1.process(&mut self.head.0, ctx, event),
-            Coproduct::Inr(r) => match *r {},
-        }
+        ITransition::<_, _, _, Coproduct<PhantomData<Source>, CNil>, _, _>::process(&mut HNil, source, ctx, event)
     }
 
-    fn target(&mut self, source: &mut Coproduct<PhantomData<Source>, CNil>) -> Target {
-        match source {
-            Coproduct::Inl(_) => self.head.1.target(&mut self.head.0),
-            Coproduct::Inr(r) => match *r {},
-        }
+    fn target(&mut self, source: &mut Coproduct<PhantomData<Source>, CNil>) -> Coproduct<PhantomData<Source>, CNil> {
+        ITransition::<_, Ctx, Event, _, _, _>::target(&mut HNil, &mut self.head.0)
+    }
+}*/
+impl<Ctx, Event, Target> ITransition<CNil, Ctx, Event, Target, ()> for HMapNil {
+    fn process(&mut self, _: &mut CNil, _: &mut Ctx, _: Event) -> Result<Target, ()> {
+        Err(())
     }
 }
 
-impl<
-        Source,
-        SourceMiddle,
-        SourceRest,
-        Trans,
-        TransMiddle,
-        Ctx,
-        Event,
-        Rest,
-        Other,
-        OtherRest,
-        Target,
-        Idx,
-    >
+impl<Source, SourceRest, Trans, Ctx, Event, Rest, OtherHM, OtherRest, Target>
     ITransition<
-        Coproduct<PhantomData<Source>, Coproduct<PhantomData<SourceMiddle>, SourceRest>>,
+        Coproduct<PhantomData<Source>, SourceRest>,
         Ctx,
         Event,
         Target,
-        Here,
-        (Other, OtherRest, Idx),
-    > for HCons<(Source, Trans), HCons<(SourceMiddle, TransMiddle), Rest>>
+        (OtherHM, OtherRest, (Source, Trans)),
+    > for HCons<(Source, Trans), Rest>
 where
-    Trans: ITransition<Source, Ctx, Event, Target, Idx, Other>,
-    HCons<(SourceMiddle, TransMiddle), Rest>: ITransition<
-        Coproduct<PhantomData<SourceMiddle>, SourceRest>,
-        Ctx,
-        Event,
-        Target,
-        Here,
-        OtherRest,
-    >,
+    Trans: ITransition<Source, Ctx, Event, Target, OtherHM>,
+    Rest: ITransition<SourceRest, Ctx, Event, Target, OtherRest>,
 {
     fn process(
         &mut self,
-        source: &mut Coproduct<
-            PhantomData<Source>,
-            Coproduct<PhantomData<SourceMiddle>, SourceRest>,
-        >,
+        source: &mut Coproduct<PhantomData<Source>, SourceRest>,
         ctx: &mut Ctx,
         event: Event,
-    ) -> Result<Event, Event> {
+    ) -> Result<Target, ()> {
         match source {
             Coproduct::Inl(_) => self.head.1.process(&mut self.head.0, ctx, event),
             Coproduct::Inr(r) => {
                 let HCons { head: _, tail } = self;
                 tail.process(r, ctx, event)
             }
-        }
-    }
-
-    fn target(
-        &mut self,
-        source: &mut Coproduct<
-            PhantomData<Source>,
-            Coproduct<PhantomData<SourceMiddle>, SourceRest>,
-        >,
-    ) -> Target {
-        match source {
-            Coproduct::Inl(_) => self.head.1.target(&mut self.head.0),
-            Coproduct::Inr(r) => self.tail.target(r),
         }
     }
 }

@@ -1,15 +1,16 @@
+use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData};
 use frunk::coproduct::CNil;
 use frunk::hlist::{h_cons, HList, Selector};
 use frunk::indices::{Here, There};
-use frunk::{Coproduct, HCons, HNil};
+use frunk::{Coproduct, HCons};
 use std::marker::PhantomData;
 
 pub struct HMap<H> {
     pub hlist: H,
 }
-impl HMap<HNil> {
+impl HMap<HMapNil> {
     pub fn new() -> Self {
-        Self { hlist: HNil }
+        Self { hlist: HMapNil }
     }
 }
 
@@ -25,6 +26,54 @@ where
     fn get(&'a self) -> &'a Value {
         let (_, v) = self.hlist.get();
         v
+    }
+}
+
+pub trait HMapGetKeyByCoprod<'a, C, CRes> {
+    fn get_by_coprod(&'a self, c: &C) -> CRes;
+}
+
+impl<'a, C, H>
+    HMapGetKeyByCoprod<
+        'a,
+        C,
+        <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef,
+    > for HMap<H>
+where
+    C: CoprodWithoutPhantomData,
+    C::WithoutPD: CoprodWithRef<'a>,
+    <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef: 'a,
+    H: HMapGetKeyByCoprod<
+        'a,
+        C,
+        <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef,
+    >,
+{
+    fn get_by_coprod<'b>(
+        &'a self,
+        c: &'b C,
+    ) -> <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef {
+        self.hlist.get_by_coprod(c)
+    }
+}
+
+impl<'a> HMapGetKeyByCoprod<'a, CNil, CNil> for HMapNil {
+    fn get_by_coprod(&'a self, c: &CNil) -> CNil {
+        match *c {}
+    }
+}
+
+impl<'a, C, V, CRest, CResRest, HRest>
+    HMapGetKeyByCoprod<'a, Coproduct<PhantomData<C>, CRest>, Coproduct<&'a C, CResRest>>
+    for HCons<(C, V), HRest>
+where
+    HRest: HMapGetKeyByCoprod<'a, CRest, CResRest>,
+{
+    fn get_by_coprod(&'a self, c: &Coproduct<PhantomData<C>, CRest>) -> Coproduct<&'a C, CResRest> {
+        match c {
+            Coproduct::Inl(_) => Coproduct::Inl(&self.head.0),
+            Coproduct::Inr(r) => Coproduct::Inr(self.tail.get_by_coprod(r)),
+        }
     }
 }
 
@@ -89,36 +138,43 @@ impl<Key, Value, ValueOld: HList, Rest: HList>
     }
 }
 
-impl<Key, Value, Cur, Idx, Rest, Rest_Out> AppendInner<Key, Value, There<Idx>, HCons<Cur, Rest_Out>>
+impl<Key, Value, Cur, Idx, Rest, RestOut> AppendInner<Key, Value, There<Idx>, HCons<Cur, RestOut>>
     for HCons<Cur, Rest>
 where
-    Rest: AppendInner<Key, Value, Idx, Rest_Out>,
-    Rest_Out: HList,
+    Rest: AppendInner<Key, Value, Idx, RestOut>,
+    RestOut: HList,
 {
-    fn add(self, value: Value) -> HCons<Cur, Rest_Out> {
+    fn add(self, value: Value) -> HCons<Cur, RestOut> {
         let HCons { head, tail } = self;
         let out_tail = tail.add(value);
         out_tail.prepend(head)
     }
 }
 
-pub trait FromHList<H> {
-    fn from() -> Self;
+pub trait KeySelector<T, Idx> {
+    fn select_by_key(&mut self) -> &mut T;
 }
 
-impl<Left, V> FromHList<HCons<(Left, V), HNil>> for Coproduct<PhantomData<Left>, CNil> {
-    fn from() -> Self {
-        Self::Inl(PhantomData)
+impl<K, V, Rest> KeySelector<K, Here> for HCons<(K, V), Rest> {
+    fn select_by_key(&mut self) -> &mut K {
+        &mut self.head.0
     }
 }
 
-impl<Left, V, Middle, VMiddle, Rest, CRest>
-    FromHList<HCons<(Left, V), HCons<(Middle, VMiddle), Rest>>>
-    for Coproduct<PhantomData<Left>, Coproduct<PhantomData<Middle>, CRest>>
+impl<T, This, Idx, Rest> KeySelector<T, There<Idx>> for HCons<This, Rest>
 where
-    Coproduct<PhantomData<Middle>, CRest>: FromHList<HCons<(Middle, VMiddle), Rest>>,
+    Rest: KeySelector<T, Idx>,
 {
-    fn from() -> Self {
-        Self::Inr(FromHList::from())
+    fn select_by_key(&mut self) -> &mut T {
+        self.tail.select_by_key()
+    }
+}
+
+pub struct HMapNil;
+impl HList for HMapNil {
+    const LEN: usize = 0;
+
+    fn static_len() -> usize {
+        0
     }
 }

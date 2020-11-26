@@ -1,14 +1,11 @@
 use crate::guard::Guard;
-use crate::hmap::{AppendInner, FromHList, HMap, HMapGet};
+use crate::hmap::{AppendInner, HMap, HMapGetKeyByCoprod, HMapNil};
 use crate::transition::{Action, ITransition, Transition};
-use frunk::coproduct::{CoprodInjector, CoproductEmbedder};
-use frunk::hlist::{h_cons, HList, Selector};
-use frunk::indices::Here;
-use frunk::{Coprod, Hlist};
+use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData};
+use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
+use frunk::hlist::HList;
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
-use std::pin::Pin;
-use std::ptr::NonNull;
 
 pub struct StateMachine<Current, State, Transitions> {
     pub current: Current,
@@ -16,7 +13,9 @@ pub struct StateMachine<Current, State, Transitions> {
     pub transitions: Transitions,
 }
 
-impl<V, State> StateMachine<Coprod![PhantomData<V>], State, HMap<HCons<(V, HNil), HNil>>> {
+impl<V, State>
+    StateMachine<Coproduct<PhantomData<V>, CNil>, State, HMap<HCons<(V, HNil), HMapNil>>>
+{
     pub fn new(v: V, state: State) -> Self {
         Self {
             current: Coproduct::inject(PhantomData),
@@ -70,21 +69,64 @@ impl<C, State, Transitions: HList> StateMachine<C, State, HMap<Transitions>> {
     }
 }
 
-impl<C, State, Transitions> StateMachine<C, State, HMap<Transitions>> {
-    pub fn process<E, Other>(&mut self, event: E) -> Result<(), ()>
+impl<C, State, Transitions> StateMachine<C, State, Transitions> {
+    pub fn is<T, Idx>(&self) -> bool
     where
-        Transitions: ITransition<C, State, E, C, Here, Other>,
+        C: CoproductSelector<PhantomData<T>, Idx>,
     {
+        self.current.get().is_some()
+    }
+
+    pub fn get_current<'a>(
+        &'a self,
+    ) -> <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef
+    where
+        C: CoprodWithoutPhantomData,
+        C::WithoutPD: CoprodWithRef<'a>,
+        Transitions: HMapGetKeyByCoprod<
+            'a,
+            C,
+            <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef,
+        >,
+    {
+        self.transitions.get_by_coprod(&self.current)
+    }
+
+    pub fn get_current_as<'a, T, Idx>(&'a self) -> Option<&'a T>
+    where
+        C: CoprodWithoutPhantomData,
+        C::WithoutPD: CoprodWithRef<'a>,
+        Transitions: HMapGetKeyByCoprod<
+            'a,
+            C,
+            <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef,
+        >,
+        <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef:
+            CoproductSelector<&'a T, Idx>,
+    {
+        self.get_current().get().map(|&u| u)
+    }
+}
+
+pub trait ProcessEvent<E, Other> {
+    fn process(&mut self, event: E) -> Result<(), ()>;
+}
+
+impl<C, State, Transitions, E, OtherTR> ProcessEvent<E, OtherTR>
+    for StateMachine<C, State, HMap<Transitions>>
+where
+    Transitions: ITransition<C, State, E, C, OtherTR>,
+{
+    fn process(&mut self, event: E) -> Result<(), ()> {
         let result = self
             .transitions
             .hlist
             .process(&mut self.current, &mut self.state, event)
-            .map(|_| ())
             .map_err(|_| ());
         match result {
-            Ok(r) => {
-                self.current = self.transitions.hlist.target(&mut self.current);
-                Ok(r)
+            Ok(target) => {
+                self.current = target;
+                Ok(())
             }
             Err(e) => Err(e),
         }
