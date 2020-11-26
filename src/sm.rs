@@ -8,29 +8,36 @@ use frunk::hlist::HList;
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
 
-pub struct StateMachine<Current, State, Transitions> {
+pub struct StateMachine<Current, State, Transitions, Answer> {
     pub current: Current,
     pub state: State,
     pub transitions: Transitions,
+    pub phantom: PhantomData<Answer>,
 }
 
-impl<V, State>
-    StateMachine<Coproduct<PhantomData<V>, CNil>, State, HMap<HCons<(V, HNil), HMapNil>>>
+impl<V, State, Answer>
+    StateMachine<Coproduct<PhantomData<V>, CNil>, State, HMap<HCons<(V, HNil), HMapNil>>, Answer>
 {
     pub fn new(v: V, state: State) -> Self {
         Self {
             current: Coproduct::inject(PhantomData),
             state,
             transitions: HMap::new().add(v, HNil),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<C, State, Transitions: HList> StateMachine<C, State, HMap<Transitions>> {
+impl<C, State, Transitions: HList, Answer> StateMachine<C, State, HMap<Transitions>, Answer> {
     pub fn add_vertex<V, Inds>(
         self,
         vertex: V,
-    ) -> StateMachine<Coproduct<PhantomData<V>, C>, State, HMap<HCons<(V, HNil), Transitions>>>
+    ) -> StateMachine<
+        Coproduct<PhantomData<V>, C>,
+        State,
+        HMap<HCons<(V, HNil), Transitions>>,
+        Answer,
+    >
     where
         C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>,
     {
@@ -38,11 +45,13 @@ impl<C, State, Transitions: HList> StateMachine<C, State, HMap<Transitions>> {
             current,
             state,
             transitions,
+            phantom,
         } = self;
         StateMachine {
             current: current.embed(),
             state,
             transitions: transitions.add(vertex, HNil),
+            phantom,
         }
     }
     pub fn add_transition<A, G, S, E, Tar, AppendIdx, Out>(
@@ -50,27 +59,29 @@ impl<C, State, Transitions: HList> StateMachine<C, State, HMap<Transitions>> {
         action: A,
         guard: G,
         _target: PhantomData<Tar>,
-    ) -> StateMachine<C, State, HMap<Out>>
+    ) -> StateMachine<C, State, HMap<Out>, Answer>
     where
         Transitions:
-            AppendInner<S, Transition<S, State, E, A, G, PhantomData<Tar>>, AppendIdx, Out>,
-        A: Action<S, State, E>,
+            AppendInner<S, Transition<S, State, E, A, G, PhantomData<Tar>, Answer>, AppendIdx, Out>,
+        A: Action<S, State, E, Answer>,
         G: Guard<E>,
     {
         let StateMachine {
             current,
             state,
             transitions,
+            phantom,
         } = self;
         StateMachine {
             current,
             state,
             transitions: transitions.append_inner(Transition::new(action, guard)),
+            phantom,
         }
     }
 }
 
-impl<C, State, Transitions> StateMachine<C, State, Transitions> {
+impl<C, State, Transitions, Answer> StateMachine<C, State, Transitions, Answer> {
     pub fn is<T, Idx>(&self) -> bool
     where
         C: CoproductSelector<PhantomData<T>, Idx>,
@@ -109,26 +120,26 @@ impl<C, State, Transitions> StateMachine<C, State, Transitions> {
     }
 }
 
-pub trait ProcessEvent<E, Other> {
-    fn process(&mut self, event: E) -> Result<(), ()>;
+pub trait ProcessEvent<E, Answer, Other> {
+    fn process(&mut self, event: E) -> Result<Answer, ()>;
 }
 
-impl<C, State, Transitions, E, OtherTR> ProcessEvent<E, OtherTR>
-    for StateMachine<C, State, HMap<Transitions>>
+impl<C, State, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer, OtherTR>
+    for StateMachine<C, State, HMap<Transitions>, Answer>
 where
-    Transitions: ITransition<C, State, E, C, OtherTR> + VertexHList<C>,
+    Transitions: ITransition<C, State, E, C, Answer, OtherTR> + VertexHList<C>,
 {
-    fn process(&mut self, event: E) -> Result<(), ()> {
+    fn process(&mut self, event: E) -> Result<Answer, ()> {
         let result = self
             .transitions
             .hlist
             .process(&mut self.current, &mut self.state, event)
             .map_err(|_| ());
         match result {
-            Ok(mut target) => {
+            Ok((answer, mut target)) => {
                 self.transitions.hlist.entry(&mut target);
                 self.current = target;
-                Ok(())
+                Ok(answer)
             }
             Err(e) => Err(e),
         }
