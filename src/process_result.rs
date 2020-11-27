@@ -1,15 +1,15 @@
-pub enum ProcessResult<Answer> {
+pub enum ProcessResult<Answer, GErr> {
     Handled(Answer),
     NoTransitions,
-    GuardReturnFalse,
+    GuardErr(GErr),
 }
 
-impl<Answer> ProcessResult<Answer> {
+impl<Answer, GErr> ProcessResult<Answer, GErr> {
     pub fn ok(self) -> Option<Answer> {
         match self {
             ProcessResult::Handled(h) => Some(h),
             ProcessResult::NoTransitions => None,
-            ProcessResult::GuardReturnFalse => None,
+            ProcessResult::GuardErr(_) => None,
         }
     }
 
@@ -19,7 +19,7 @@ impl<Answer> ProcessResult<Answer> {
         match self {
             Handled(a) => a,
             NoTransitions => unreachable!("Expected handled result, found `NoTransitions`"),
-            GuardReturnFalse => unreachable!("Expected handled result, found `GuardReturnFalse`"),
+            GuardErr(_) => unreachable!("Expected handled result, found `GuardReturnFalse`"),
         }
     }
 
@@ -31,35 +31,35 @@ impl<Answer> ProcessResult<Answer> {
     }
 }
 
-pub enum ProcessResultInner<Answer> {
+pub enum ProcessResultInner<Answer, GErr> {
     HandledAndProcessNext,
     HandledAndProcessEnd(Answer),
     NoTransitions,
-    GuardReturnFalse,
+    GuardErr(GErr),
 }
 
-impl<Answer> Into<ProcessResult<Answer>> for ProcessResultInner<Answer> {
-    fn into(self) -> ProcessResult<Answer> {
+impl<Answer, GErr> Into<ProcessResult<Answer, GErr>> for ProcessResultInner<Answer, GErr> {
+    fn into(self) -> ProcessResult<Answer, GErr> {
         use ProcessResultInner::*;
 
         match self {
             HandledAndProcessNext => unreachable!(),
             HandledAndProcessEnd(a) => ProcessResult::Handled(a),
             NoTransitions => ProcessResult::NoTransitions,
-            GuardReturnFalse => ProcessResult::GuardReturnFalse,
+            GuardErr(e) => ProcessResult::GuardErr(e),
         }
     }
 }
 
-impl<A> ProcessResultInner<A> {
-    pub fn map<ANew>(self, f: impl Fn(A) -> ANew) -> ProcessResultInner<ANew> {
+impl<A, GErr> ProcessResultInner<A, GErr> {
+    pub fn map<ANew>(self, f: impl Fn(A) -> ANew) -> ProcessResultInner<ANew, GErr> {
         use ProcessResultInner::*;
 
         match self {
             HandledAndProcessNext => HandledAndProcessNext,
             HandledAndProcessEnd(a) => HandledAndProcessEnd(f(a)),
             NoTransitions => NoTransitions,
-            GuardReturnFalse => GuardReturnFalse,
+            GuardErr(e) => GuardErr(e),
         }
     }
 }

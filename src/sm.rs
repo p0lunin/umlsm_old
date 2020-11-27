@@ -10,15 +10,15 @@ use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
 
-pub struct StateMachine<Current, State, Vertexes, Transitions, Answer> {
+pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr = ()> {
     pub current: Current,
     pub state: State,
     pub vertexes: Vertexes,
     pub transitions: Transitions,
-    pub phantom: PhantomData<Answer>,
+    pub phantom: PhantomData<(Answer, GErr)>,
 }
 
-impl<State, Answer>
+impl<State, Answer, GErr>
     StateMachine<
         Coproduct<
             PhantomData<InitialPseudoState>,
@@ -33,6 +33,7 @@ impl<State, Answer>
             >,
         >,
         Answer,
+        GErr,
     >
 {
     pub fn new(state: State) -> Self {
@@ -46,8 +47,8 @@ impl<State, Answer>
     }
 }
 
-impl<C, State, Vertexes: HList, Transitions: HList, Answer>
-    StateMachine<C, State, Vertexes, HMap<Transitions>, Answer>
+impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
+    StateMachine<C, State, Vertexes, HMap<Transitions>, Answer, GErr>
 {
     pub fn add_vertex<V, Inds>(
         self,
@@ -58,6 +59,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer>
         HCons<V, Vertexes>,
         HMap<HCons<(PhantomData<V>, HNil), Transitions>>,
         Answer,
+        GErr,
     >
     where
         C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>,
@@ -82,16 +84,16 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer>
         action: A,
         guard: G,
         _target: PhantomData<Tar>,
-    ) -> StateMachine<C, State, Vertexes, HMap<Out>, Answer>
+    ) -> StateMachine<C, State, Vertexes, HMap<Out>, Answer, GErr>
     where
         Transitions: AppendInner<
             PhantomData<S>,
-            Transition<S, State, E, A, G, PhantomData<Tar>, Answer>,
+            Transition<S, State, E, A, G, PhantomData<Tar>, Answer, GErr>,
             AppendIdx,
             Out,
         >,
         A: Action<S, State, E, Answer>,
-        G: Guard<E>,
+        G: Guard<E, GErr>,
     {
         let StateMachine {
             current,
@@ -116,8 +118,8 @@ pub trait CurrentStateIs<Idx, Inner> {
         Inner: CoproductSelector<PhantomData<T>, Idx>;
 }
 
-impl<C, State, Vertexes, Transitions, Answer, Idx> CurrentStateIs<Idx, C>
-    for StateMachine<C, State, Vertexes, Transitions, Answer>
+impl<C, State, Vertexes, Transitions, Answer, Idx, GErr> CurrentStateIs<Idx, C>
+    for StateMachine<C, State, Vertexes, Transitions, Answer, GErr>
 {
     fn is<T>(&self) -> bool
     where
@@ -127,8 +129,8 @@ impl<C, State, Vertexes, Transitions, Answer, Idx> CurrentStateIs<Idx, C>
     }
 }
 
-impl<C, State, Vertexes, Transitions, Answer>
-    StateMachine<C, State, Vertexes, Transitions, Answer>
+impl<C, State, Vertexes, Transitions, Answer, GErr>
+    StateMachine<C, State, Vertexes, Transitions, Answer, GErr>
 {
     pub fn get_current<'a>(
         &'a self,
@@ -161,16 +163,17 @@ impl<C, State, Vertexes, Transitions, Answer>
     }
 }
 
-pub trait ProcessEvent<E, Answer, Other> {
-    fn process(&mut self, event: &E) -> ProcessResult<Answer>;
+pub trait ProcessEvent<E, Answer, GErr, Other> {
+    fn process(&mut self, event: &E) -> ProcessResult<Answer, GErr>;
 }
 
-impl<C, State, Vertexes, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer, (OtherTR,)>
-    for StateMachine<C, State, Vertexes, HMap<Transitions>, Answer>
+impl<C, State, Vertexes, Transitions, E, OtherTR, Answer, GErr>
+    ProcessEvent<E, Answer, GErr, (OtherTR,)>
+    for StateMachine<C, State, Vertexes, HMap<Transitions>, Answer, GErr>
 where
-    Transitions: ITransition<C, State, E, C, Vertexes, Answer, OtherTR>,
+    Transitions: ITransition<C, State, E, C, Vertexes, Answer, GErr, OtherTR>,
 {
-    fn process(&mut self, event: &E) -> ProcessResult<Answer> {
+    fn process(&mut self, event: &E) -> ProcessResult<Answer, GErr> {
         use ProcessResultInner::*;
 
         let result = self.transitions.hlist.process(
@@ -186,7 +189,7 @@ where
             }
             HandledAndProcessNext => ProcessEvent::process(self, &event),
             NoTransitions => ProcessResult::NoTransitions,
-            GuardReturnFalse => ProcessResult::GuardReturnFalse,
+            GuardErr(ge) => ProcessResult::GuardErr(ge),
         }
     }
 }

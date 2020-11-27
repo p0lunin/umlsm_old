@@ -23,11 +23,15 @@ macro_rules! state_machine {
     (parse_source, _) => { _ };
     (parse_source, $some:ty) => { $some };
     (parse_source, ($some:ty)) => { $some };
+
     (parse_action, $source:tt, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source)>::new() };
     (parse_action, $source:tt, $action:expr) => { $action };
 
-    (state = $state:expr, [$($vertex:expr),*], $($source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty),*) => {
-        $crate::StateMachine::new($state)
+    (parse_err, ) => { () };
+    (parse_err, $some:ty) => { $some };
+
+    (state = $state:expr $(, err = $err:ty)?, [$($vertex:expr),*], $($source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty),*) => {
+        $crate::StateMachine::<_, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex))*
             $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
                 $crate::state_machine!(parse_action, $source, $($action)?),

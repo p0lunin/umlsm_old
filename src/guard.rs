@@ -1,30 +1,30 @@
 use frunk::{HCons, HNil};
 
-pub trait Guard<Input> {
-    fn check(&self, input: &Input) -> bool;
+pub trait Guard<Input, Err> {
+    fn check(&self, input: &Input) -> Result<(), Err>;
 }
 
-impl<Input, F> Guard<Input> for F
+impl<Input, F, Err> Guard<Input, Err> for F
 where
-    F: Fn(&Input) -> bool,
+    F: Fn(&Input) -> Result<(), Err>,
 {
-    fn check(&self, input: &Input) -> bool {
+    fn check(&self, input: &Input) -> Result<(), Err> {
         self(input)
     }
 }
 
-impl<Input> Guard<Input> for HNil {
-    fn check(&self, _: &Input) -> bool {
-        true
+impl<Input, Err> Guard<Input, Err> for HNil {
+    fn check(&self, _: &Input) -> Result<(), Err> {
+        Ok(())
     }
 }
 
-impl<Input, F, Rest> Guard<Input> for HCons<F, Rest>
+impl<Input, F, Rest, Err> Guard<Input, Err> for HCons<F, Rest>
 where
-    F: Guard<Input>,
-    Rest: Guard<Input>,
+    F: Guard<Input, Err>,
+    Rest: Guard<Input, Err>,
 {
-    fn check(&self, input: &Input) -> bool {
-        self.head.check(input) && self.tail.check(input)
+    fn check(&self, input: &Input) -> Result<(), Err> {
+        self.head.check(input).and_then(|_| self.tail.check(input))
     }
 }

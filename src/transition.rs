@@ -7,17 +7,17 @@ use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
 
-pub struct Transition<Source, Ctx, Event, Action, Guard, Target, Answer> {
+pub struct Transition<Source, Ctx, Event, Action, Guard, Target, Answer, GErr> {
     action: Action,
     guard: Guard,
-    phantom: PhantomData<(Source, Ctx, Event, Target, Answer)>,
+    phantom: PhantomData<(Source, Ctx, Event, Target, Answer, GErr)>,
 }
 
-impl<Source, Ctx, Event, ActionT, GuardT, Target, Answer>
-    Transition<Source, Ctx, Event, ActionT, GuardT, Target, Answer>
+impl<Source, Ctx, Event, ActionT, GuardT, GErr, Target, Answer>
+    Transition<Source, Ctx, Event, ActionT, GuardT, Target, Answer, GErr>
 where
     ActionT: Action<Source, Ctx, Event, Answer>,
-    GuardT: Guard<Event>,
+    GuardT: Guard<Event, GErr>,
 {
     pub fn new(action: ActionT, guard: GuardT) -> Self {
         Transition {
@@ -28,17 +28,17 @@ where
     }
 }
 
-pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, Other> {
+pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, GErr, Other> {
     fn process(
         &mut self,
         source: &mut Source,
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Target)>;
+    ) -> ProcessResultInner<(Answer, Target), GErr>;
 }
 
-impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, Idx1, Idx2>
+impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, GErr, Idx1, Idx2>
     ITransition<
         PhantomData<Source>,
         Ctx,
@@ -46,14 +46,15 @@ impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, Idx1, Idx2>
         Coproduct<PhantomData<Target>, CNil>,
         Vertexes,
         Answer,
+        GErr,
         (Idx1, Idx2),
-    > for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>, Answer>
+    > for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>, Answer, GErr>
 where
     Vertexes: Selector<Source, Idx1> + Selector<Target, Idx2>,
     Source: ExitVertex<Event>,
     Target: EntryVertex<Event>,
     ActionT: Action<Source, Ctx, Event, Answer>,
-    GuardT: Guard<Event>,
+    GuardT: Guard<Event, GErr>,
 {
     fn process(
         &mut self,
@@ -61,23 +62,23 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Coproduct<PhantomData<Target>, CNil>)> {
+    ) -> ProcessResultInner<(Answer, Coproduct<PhantomData<Target>, CNil>), GErr> {
         use ProcessResultInner::*;
-
-        if self.guard.check(event) {
-            let source = Selector::<Source, Idx1>::get_mut(vertexes);
-            source.exit(&event);
-            let answer = self.action.trigger(source, ctx, &event);
-            Selector::<Target, Idx2>::get_mut(vertexes).entry(&event);
-            HandledAndProcessEnd((answer, Coproduct::inject(PhantomData)))
-        } else {
-            GuardReturnFalse
+        match self.guard.check(event) {
+            Ok(_) => {
+                let source = Selector::<Source, Idx1>::get_mut(vertexes);
+                source.exit(&event);
+                let answer = self.action.trigger(source, ctx, &event);
+                Selector::<Target, Idx2>::get_mut(vertexes).entry(&event);
+                HandledAndProcessEnd((answer, Coproduct::inject(PhantomData)))
+            }
+            Err(e) => GuardErr(e),
         }
     }
 }
 
-impl<Source, Ctx, Event, Vertexes, Target, Answer>
-    ITransition<Source, Ctx, Event, Target, Vertexes, Answer, ()> for HNil
+impl<Source, Ctx, Event, Vertexes, Target, Answer, GErr>
+    ITransition<Source, Ctx, Event, Target, Vertexes, Answer, GErr, ()> for HNil
 {
     fn process(
         &mut self,
@@ -85,7 +86,7 @@ impl<Source, Ctx, Event, Vertexes, Target, Answer>
         _: &mut Ctx,
         _: &Event,
         _: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Target)> {
+    ) -> ProcessResultInner<(Answer, Target), GErr> {
         ProcessResultInner::NoTransitions
     }
 }
@@ -103,6 +104,7 @@ impl<
         TransEvent,
         OtherTrans,
         Answer,
+        GErr,
         Trans,
     >
     ITransition<
@@ -112,6 +114,7 @@ impl<
         Target,
         Vertexes,
         Answer,
+        GErr,
         (TargetUnit, Indices, Other, OtherTrans, TransEvent),
     > for HCons<Trans, Rest>
 where
@@ -122,10 +125,11 @@ where
         Coproduct<PhantomData<TargetUnit>, CNil>,
         Vertexes,
         Answer,
+        GErr,
         OtherTrans,
     >,
     Coproduct<PhantomData<TargetUnit>, CNil>: CoproductEmbedder<Target, Indices>,
-    Rest: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, Other>,
+    Rest: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, GErr, Other>,
     Event: 'static,
     TransEvent: 'static,
 {
@@ -135,7 +139,7 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Target)> {
+    ) -> ProcessResultInner<(Answer, Target), GErr> {
         if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
             self.head
                 .process(source, ctx, unsafe { std::mem::transmute(event) }, vertexes)
@@ -146,8 +150,8 @@ where
     }
 }
 
-impl<Ctx, Event, Target, Vertexes, Answer>
-    ITransition<CNil, Ctx, Event, Target, Vertexes, Answer, ()> for HMapNil
+impl<Ctx, Event, Target, Vertexes, Answer, GErr>
+    ITransition<CNil, Ctx, Event, Target, Vertexes, Answer, GErr, ()> for HMapNil
 {
     fn process(
         &mut self,
@@ -155,12 +159,25 @@ impl<Ctx, Event, Target, Vertexes, Answer>
         _: &mut Ctx,
         _: &Event,
         _: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Target)> {
+    ) -> ProcessResultInner<(Answer, Target), GErr> {
         match *source {}
     }
 }
 
-impl<Source, SourceRest, Trans, Ctx, Event, Rest, OtherHM, OtherRest, Target, Vertexes, Answer>
+impl<
+        Source,
+        SourceRest,
+        Trans,
+        Ctx,
+        Event,
+        Rest,
+        OtherHM,
+        OtherRest,
+        Target,
+        Vertexes,
+        Answer,
+        GErr,
+    >
     ITransition<
         Coproduct<PhantomData<Source>, SourceRest>,
         Ctx,
@@ -168,11 +185,12 @@ impl<Source, SourceRest, Trans, Ctx, Event, Rest, OtherHM, OtherRest, Target, Ve
         Target,
         Vertexes,
         Answer,
+        GErr,
         (OtherHM, OtherRest, (Source, Trans)),
     > for HCons<(PhantomData<Source>, Trans), Rest>
 where
-    Trans: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, OtherHM>,
-    Rest: ITransition<SourceRest, Ctx, Event, Target, Vertexes, Answer, OtherRest>,
+    Trans: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, GErr, OtherHM>,
+    Rest: ITransition<SourceRest, Ctx, Event, Target, Vertexes, Answer, GErr, OtherRest>,
 {
     fn process(
         &mut self,
@@ -180,7 +198,7 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Target)> {
+    ) -> ProcessResultInner<(Answer, Target), GErr> {
         match source {
             Coproduct::Inl(l) => self.head.1.process(l, ctx, event, vertexes),
             Coproduct::Inr(r) => {
