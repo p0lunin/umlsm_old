@@ -32,7 +32,7 @@ pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, Other> {
         &mut self,
         source: &mut Source,
         ctx: &mut Ctx,
-        event: Event,
+        event: &Event,
         vertexes: &mut Vertexes,
     ) -> Result<(Answer, Target), ()>;
 }
@@ -49,8 +49,8 @@ impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, Idx1, Idx2>
     > for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>, Answer>
 where
     Vertexes: Selector<Source, Idx1> + Selector<Target, Idx2>,
-    Source: Vertex,
-    Target: Vertex,
+    Source: Vertex<Event>,
+    Target: Vertex<Event>,
     ActionT: Action<Source, Ctx, Event, Answer>,
     GuardT: Guard<Event>,
 {
@@ -58,14 +58,14 @@ where
         &mut self,
         _: &mut PhantomData<Source>,
         ctx: &mut Ctx,
-        event: Event,
+        event: &Event,
         vertexes: &mut Vertexes,
     ) -> Result<(Answer, Coproduct<PhantomData<Target>, CNil>), ()> {
-        if self.guard.check(&event) {
+        if self.guard.check(event) {
             let source = Selector::<Source, Idx1>::get_mut(vertexes);
             source.exit();
-            let answer = self.action.trigger(source, ctx, &event);
-            Selector::<Target, Idx2>::get_mut(vertexes).entry();
+            let answer = self.action.trigger(source, ctx, event);
+            Selector::<Target, Idx2>::get_mut(vertexes).entry(event);
             Ok((answer, Coproduct::inject(PhantomData)))
         } else {
             Err(())
@@ -80,7 +80,7 @@ impl<Source, Ctx, Event, Vertexes, Target, Answer>
         &mut self,
         _: &mut Source,
         _: &mut Ctx,
-        _: Event,
+        _: &Event,
         _: &mut Vertexes,
     ) -> Result<(Answer, Target), ()> {
         Err(())
@@ -136,7 +136,7 @@ where
         &mut self,
         source: &mut PhantomData<Source>,
         ctx: &mut Ctx,
-        event: Event,
+        event: &Event,
         vertexes: &mut Vertexes,
     ) -> Result<(Answer, Target), ()> {
         if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
@@ -144,7 +144,7 @@ where
                 .process(
                     source,
                     ctx,
-                    unsafe { std::mem::transmute_copy(&event) },
+                    unsafe { std::mem::transmute(&event) },
                     vertexes,
                 )
                 .map(|(a, t)| (a, t.embed()))
@@ -161,7 +161,7 @@ impl<Ctx, Event, Target, Vertexes, Answer>
         &mut self,
         source: &mut CNil,
         _: &mut Ctx,
-        _: Event,
+        _: &Event,
         _: &mut Vertexes,
     ) -> Result<(Answer, Target), ()> {
         match *source {}
@@ -186,7 +186,7 @@ where
         &mut self,
         source: &mut Coproduct<PhantomData<Source>, SourceRest>,
         ctx: &mut Ctx,
-        event: Event,
+        event: &Event,
         vertexes: &mut Vertexes,
     ) -> Result<(Answer, Target), ()> {
         match source {

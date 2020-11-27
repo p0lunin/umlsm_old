@@ -20,8 +20,8 @@ mod tests {
     use std::marker::PhantomData;
 
     struct Locked;
-    impl Vertex for Locked {
-        fn entry(&mut self) {
+    impl<Event> Vertex<Event> for Locked {
+        fn entry(&mut self, _: &Event) {
             unreachable!()
         }
         fn exit(&mut self) {
@@ -29,8 +29,8 @@ mod tests {
         }
     }
     struct Unlocked;
-    impl Vertex for Unlocked {
-        fn entry(&mut self) {
+    impl<Event> Vertex<Event> for Unlocked {
+        fn entry(&mut self, _: &Event) {
             println!("entry Unlocked!");
         }
         fn exit(&mut self) {
@@ -51,7 +51,7 @@ mod tests {
             .add_transition(beep, frunk::hlist![], PhantomData::<Unlocked>);
 
         let mut sm = sm;
-        ProcessEvent::process(&mut sm, Push).ok().unwrap();
+        ProcessEvent::process(&mut sm, &Push).ok().unwrap();
         assert!(sm.is::<Unlocked, _>());
         let _current = sm.get_current_as::<Unlocked, _>().unwrap();
     }

@@ -142,7 +142,7 @@ impl<C, State, Vertexes, Transitions, Answer>
 }
 
 pub trait ProcessEvent<E, Answer, Other> {
-    fn process(&mut self, event: E) -> Result<Answer, ()>;
+    fn process(&mut self, event: &E) -> Result<Answer, ()>;
 }
 
 impl<C, State, Vertexes, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer, OtherTR>
@@ -150,14 +150,14 @@ impl<C, State, Vertexes, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer
 where
     Transitions: ITransition<C, State, E, C, Vertexes, Answer, OtherTR>,
 {
-    fn process(&mut self, event: E) -> Result<Answer, ()> {
+    fn process(&mut self, event: &E) -> Result<Answer, ()> {
         let result = self
             .transitions
             .hlist
             .process(
                 &mut self.current,
                 &mut self.state,
-                event,
+                &event,
                 &mut self.vertexes,
             )
             .map_err(|_| ());
