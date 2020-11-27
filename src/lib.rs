@@ -14,13 +14,34 @@ pub use {
     vertex::{EntryVertex, ExitVertex},
 };
 
+pub mod reexport {
+    pub use frunk;
+}
+
+#[macro_export]
+macro_rules! state_machine {
+    (parse_source, _) => { _ };
+    (parse_source, $some:ty) => { $some };
+    (parse_source, ($some:ty)) => { $some };
+    (parse_action, $source:tt, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source)>::new() };
+    (parse_action, $source:tt, $action:expr) => { $action };
+
+    (state = $state:expr, [$($vertex:expr),*], $($source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty),*) => {
+        $crate::StateMachine::new($state)
+            $(.add_vertex($vertex))*
+            $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
+                $crate::state_machine!(parse_action, $source, $($action)?),
+                $crate::reexport::frunk::hlist![$($($guard:expr),*)?],
+                std::marker::PhantomData,
+            ))*
+    };
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::action::EmptyAction;
-    use crate::sm::{CurrentStateIs, ProcessEvent, StateMachine};
+    use crate::sm::{CurrentStateIs, ProcessEvent};
     use crate::vertex::{InitialPseudoState, TerminationPseudoState};
     use crate::{EntryVertex, ExitVertex};
-    use std::marker::PhantomData;
 
     struct Locked;
     impl<Event> EntryVertex<Event> for Locked {
@@ -53,20 +74,13 @@ mod tests {
 
     #[test]
     fn test() {
-        let sm = StateMachine::new(())
-            .add_vertex(Locked {})
-            .add_vertex(Unlocked {})
-            .add_transition(
-                EmptyAction::<InitialPseudoState>::new(),
-                frunk::hlist![],
-                PhantomData::<Locked>,
-            )
-            .add_transition(beep, frunk::hlist![], PhantomData::<Unlocked>)
-            .add_transition(
-                EmptyAction::<Unlocked>::new(),
-                frunk::hlist![],
-                PhantomData::<TerminationPseudoState>,
-            );
+        let sm = state_machine!(
+            state = (),
+            [Locked {}, Unlocked {}],
+            InitialPseudoState + ()   []        => Locked,
+            Locked             + Push    | beep => Unlocked,
+            Unlocked           + ()             => TerminationPseudoState
+        );
 
         let mut sm = sm;
         assert!(sm.is::<InitialPseudoState>());
