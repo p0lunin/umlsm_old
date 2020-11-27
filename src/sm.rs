@@ -10,7 +10,7 @@ use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
 
-pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr = ()> {
+pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr> {
     pub current: Current,
     pub state: State,
     pub vertexes: Vertexes,

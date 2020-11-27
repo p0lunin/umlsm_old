@@ -1,7 +1,7 @@
 pub mod action;
 mod guard;
 mod hmap;
-mod process_result;
+pub mod process_result;
 mod sm;
 mod transition;
 mod utils;
@@ -10,8 +10,9 @@ pub mod vertex;
 pub use {
     action::Action,
     guard::Guard,
-    sm::{ProcessEvent, StateMachine},
-    vertex::{EntryVertex, ExitVertex},
+    process_result::ProcessResult,
+    sm::{CurrentStateIs, ProcessEvent, StateMachine},
+    vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState},
 };
 
 pub mod reexport {
@@ -35,7 +36,7 @@ macro_rules! state_machine {
             $(.add_vertex($vertex))*
             $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
                 $crate::state_machine!(parse_action, $source, $($action)?),
-                $crate::reexport::frunk::hlist![$($($guard:expr),*)?],
+                $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
             ))*
     };
