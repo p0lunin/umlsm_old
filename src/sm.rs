@@ -1,6 +1,7 @@
 use crate::action::Action;
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
+use crate::process_result::{ProcessResult, ProcessResultInner};
 use crate::transition::{ITransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
@@ -142,31 +143,31 @@ impl<C, State, Vertexes, Transitions, Answer>
 }
 
 pub trait ProcessEvent<E, Answer, Other> {
-    fn process(&mut self, event: &E) -> Result<Answer, ()>;
+    fn process(&mut self, event: &E) -> ProcessResult<Answer>;
 }
 
-impl<C, State, Vertexes, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer, OtherTR>
+impl<C, State, Vertexes, Transitions, E, OtherTR, Answer> ProcessEvent<E, Answer, (OtherTR,)>
     for StateMachine<C, State, Vertexes, HMap<Transitions>, Answer>
 where
     Transitions: ITransition<C, State, E, C, Vertexes, Answer, OtherTR>,
 {
-    fn process(&mut self, event: &E) -> Result<Answer, ()> {
-        let result = self
-            .transitions
-            .hlist
-            .process(
-                &mut self.current,
-                &mut self.state,
-                &event,
-                &mut self.vertexes,
-            )
-            .map_err(|_| ());
+    fn process(&mut self, event: &E) -> ProcessResult<Answer> {
+        use ProcessResultInner::*;
+
+        let result = self.transitions.hlist.process(
+            &mut self.current,
+            &mut self.state,
+            &event,
+            &mut self.vertexes,
+        );
         match result {
-            Ok((answer, target)) => {
+            HandledAndProcessEnd((answer, target)) => {
                 self.current = target;
-                Ok(answer)
+                ProcessResult::Handled(answer)
             }
-            Err(e) => Err(e),
+            HandledAndProcessNext => ProcessEvent::process(self, &event),
+            NoTransitions => ProcessResult::NoTransitions,
+            GuardReturnFalse => ProcessResult::GuardReturnFalse,
         }
     }
 }

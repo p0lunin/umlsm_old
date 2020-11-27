@@ -1,4 +1,5 @@
 use crate::hmap::HMapNil;
+use crate::process_result::ProcessResultInner;
 use crate::{Action, EntryVertex, ExitVertex, Guard};
 use frunk::coproduct::{CNil, CoproductEmbedder};
 use frunk::hlist::Selector;
@@ -34,7 +35,7 @@ pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, Other> {
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> Result<(Answer, Target), ()>;
+    ) -> ProcessResultInner<(Answer, Target)>;
 }
 
 impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, Idx1, Idx2>
@@ -60,15 +61,17 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> Result<(Answer, Coproduct<PhantomData<Target>, CNil>), ()> {
+    ) -> ProcessResultInner<(Answer, Coproduct<PhantomData<Target>, CNil>)> {
+        use ProcessResultInner::*;
+
         if self.guard.check(event) {
             let source = Selector::<Source, Idx1>::get_mut(vertexes);
-            source.exit(event);
-            let answer = self.action.trigger(source, ctx, event);
-            Selector::<Target, Idx2>::get_mut(vertexes).entry(event);
-            Ok((answer, Coproduct::inject(PhantomData)))
+            source.exit(&event);
+            let answer = self.action.trigger(source, ctx, &event);
+            Selector::<Target, Idx2>::get_mut(vertexes).entry(&event);
+            HandledAndProcessEnd((answer, Coproduct::inject(PhantomData)))
         } else {
-            Err(())
+            GuardReturnFalse
         }
     }
 }
@@ -82,8 +85,8 @@ impl<Source, Ctx, Event, Vertexes, Target, Answer>
         _: &mut Ctx,
         _: &Event,
         _: &mut Vertexes,
-    ) -> Result<(Answer, Target), ()> {
-        Err(())
+    ) -> ProcessResultInner<(Answer, Target)> {
+        ProcessResultInner::NoTransitions
     }
 }
 
@@ -138,15 +141,10 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> Result<(Answer, Target), ()> {
+    ) -> ProcessResultInner<(Answer, Target)> {
         if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
             self.head
-                .process(
-                    source,
-                    ctx,
-                    unsafe { std::mem::transmute(&event) },
-                    vertexes,
-                )
+                .process(source, ctx, unsafe { std::mem::transmute(event) }, vertexes)
                 .map(|(a, t)| (a, t.embed()))
         } else {
             self.tail.process(source, ctx, event, vertexes)
@@ -163,7 +161,7 @@ impl<Ctx, Event, Target, Vertexes, Answer>
         _: &mut Ctx,
         _: &Event,
         _: &mut Vertexes,
-    ) -> Result<(Answer, Target), ()> {
+    ) -> ProcessResultInner<(Answer, Target)> {
         match *source {}
     }
 }
@@ -188,7 +186,7 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> Result<(Answer, Target), ()> {
+    ) -> ProcessResultInner<(Answer, Target)> {
         match source {
             Coproduct::Inl(l) => self.head.1.process(l, ctx, event, vertexes),
             Coproduct::Inr(r) => {

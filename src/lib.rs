@@ -1,6 +1,7 @@
 mod action;
 mod guard;
 mod hmap;
+mod process_result;
 mod sm;
 mod transition;
 mod utils;
@@ -10,7 +11,7 @@ pub use {
     action::Action,
     guard::Guard,
     sm::{ProcessEvent, StateMachine},
-    vertex::{EntryVertex, ExitVertex},
+    vertex::{EmptyVertex, EntryVertex, ExitVertex},
 };
 
 #[cfg(test)]
@@ -20,11 +21,6 @@ mod tests {
     use std::marker::PhantomData;
 
     struct Locked;
-    impl<Event> EntryVertex<Event> for Locked {
-        fn entry(&mut self, _: &Event) {
-            unreachable!()
-        }
-    }
     impl<Event> ExitVertex<Event> for Locked {
         fn exit(&mut self, _: &Event) {
             println!("exit Locked!");
@@ -34,11 +30,6 @@ mod tests {
     impl<Event> EntryVertex<Event> for Unlocked {
         fn entry(&mut self, _: &Event) {
             println!("entry Unlocked!");
-        }
-    }
-    impl<Event> ExitVertex<Event> for Unlocked {
-        fn exit(&mut self, _: &Event) {
-            unreachable!()
         }
     }
 
