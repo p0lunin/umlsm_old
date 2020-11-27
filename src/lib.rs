@@ -10,30 +10,34 @@ pub use {
     action::Action,
     guard::Guard,
     sm::{ProcessEvent, StateMachine},
-    vertex::Vertex,
+    vertex::{EntryVertex, ExitVertex},
 };
 
 #[cfg(test)]
 mod tests {
     use crate::sm::{ProcessEvent, StateMachine};
-    use crate::Vertex;
+    use crate::{EntryVertex, ExitVertex};
     use std::marker::PhantomData;
 
     struct Locked;
-    impl<Event> Vertex<Event> for Locked {
+    impl<Event> EntryVertex<Event> for Locked {
         fn entry(&mut self, _: &Event) {
             unreachable!()
         }
-        fn exit(&mut self) {
+    }
+    impl<Event> ExitVertex<Event> for Locked {
+        fn exit(&mut self, _: &Event) {
             println!("exit Locked!");
         }
     }
     struct Unlocked;
-    impl<Event> Vertex<Event> for Unlocked {
+    impl<Event> EntryVertex<Event> for Unlocked {
         fn entry(&mut self, _: &Event) {
             println!("entry Unlocked!");
         }
-        fn exit(&mut self) {
+    }
+    impl<Event> ExitVertex<Event> for Unlocked {
+        fn exit(&mut self, _: &Event) {
             unreachable!()
         }
     }

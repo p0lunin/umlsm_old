@@ -1,4 +1,7 @@
-pub trait Vertex<Event> {
+pub trait EntryVertex<Event> {
     fn entry(&mut self, event: &Event);
-    fn exit(&mut self);
+}
+
+pub trait ExitVertex<Event> {
+    fn exit(&mut self, event: &Event);
 }

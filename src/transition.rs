@@ -1,5 +1,5 @@
 use crate::hmap::HMapNil;
-use crate::{Action, Guard, Vertex};
+use crate::{Action, EntryVertex, ExitVertex, Guard};
 use frunk::coproduct::{CNil, CoproductEmbedder};
 use frunk::hlist::Selector;
 use frunk::{Coproduct, HCons, HNil};
@@ -49,8 +49,8 @@ impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, Idx1, Idx2>
     > for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>, Answer>
 where
     Vertexes: Selector<Source, Idx1> + Selector<Target, Idx2>,
-    Source: Vertex<Event>,
-    Target: Vertex<Event>,
+    Source: ExitVertex<Event>,
+    Target: EntryVertex<Event>,
     ActionT: Action<Source, Ctx, Event, Answer>,
     GuardT: Guard<Event>,
 {
@@ -63,7 +63,7 @@ where
     ) -> Result<(Answer, Coproduct<PhantomData<Target>, CNil>), ()> {
         if self.guard.check(event) {
             let source = Selector::<Source, Idx1>::get_mut(vertexes);
-            source.exit();
+            source.exit(event);
             let answer = self.action.trigger(source, ctx, event);
             Selector::<Target, Idx2>::get_mut(vertexes).entry(event);
             Ok((answer, Coproduct::inject(PhantomData)))
