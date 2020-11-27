@@ -12,6 +12,16 @@ impl<Answer> ProcessResult<Answer> {
             ProcessResult::GuardReturnFalse => None,
         }
     }
+
+    pub fn unwrap(self) -> Answer {
+        use ProcessResult::*;
+
+        match self {
+            Handled(a) => a,
+            NoTransitions => unreachable!("Expected handled result, found `NoTransitions`"),
+            GuardReturnFalse => unreachable!("Expected handled result, found `GuardReturnFalse`"),
+        }
+    }
 }
 
 pub enum ProcessResultInner<Answer> {

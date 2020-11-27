@@ -190,3 +190,8 @@ where
         }
     }
 }
+/*
+pub struct StateMachineTransition<Current, > {
+    sm: StateMachine<>
+}
+*/

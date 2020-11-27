@@ -21,3 +21,13 @@ impl<E, T> EntryVertex<E> for EmptyVertex<T> {
 impl<E, T> ExitVertex<E> for EmptyVertex<T> {
     fn exit(&mut self, _: &E) {}
 }
+
+pub struct InitialPseudoState;
+impl<E> ExitVertex<E> for InitialPseudoState {
+    fn exit(&mut self, _: &E) {}
+}
+
+pub struct TerminationPseudoState;
+impl<E> EntryVertex<E> for TerminationPseudoState {
+    fn entry(&mut self, _: &E) {}
+}

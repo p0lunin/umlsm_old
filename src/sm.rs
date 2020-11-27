@@ -4,6 +4,7 @@ use crate::hmap::{AppendInner, HMap, HMapNil};
 use crate::process_result::{ProcessResult, ProcessResultInner};
 use crate::transition::{ITransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
+use crate::vertex::{InitialPseudoState, TerminationPseudoState};
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
@@ -17,21 +18,29 @@ pub struct StateMachine<Current, State, Vertexes, Transitions, Answer> {
     pub phantom: PhantomData<Answer>,
 }
 
-impl<V, State, Answer>
+impl<State, Answer>
     StateMachine<
-        Coproduct<PhantomData<V>, CNil>,
+        Coproduct<
+            PhantomData<InitialPseudoState>,
+            Coproduct<PhantomData<TerminationPseudoState>, CNil>,
+        >,
         State,
-        HCons<V, HNil>,
-        HMap<HCons<(PhantomData<V>, HNil), HMapNil>>,
+        HCons<InitialPseudoState, HCons<TerminationPseudoState, HNil>>,
+        HMap<
+            HCons<
+                (PhantomData<InitialPseudoState>, HNil),
+                HCons<(PhantomData<TerminationPseudoState>, HNil), HMapNil>,
+            >,
+        >,
         Answer,
     >
 {
-    pub fn new(v: V, state: State) -> Self {
+    pub fn new(state: State) -> Self {
         Self {
-            current: Coproduct::inject(PhantomData),
+            current: Coproduct::inject(PhantomData::<InitialPseudoState>),
             state,
-            vertexes: h_cons(v, HNil),
-            transitions: HMap::new().add(PhantomData, HNil),
+            vertexes: h_cons(InitialPseudoState, h_cons(TerminationPseudoState, HNil)),
+            transitions: HMap::new().add(PhantomData, HNil).add(PhantomData, HNil),
             phantom: PhantomData,
         }
     }

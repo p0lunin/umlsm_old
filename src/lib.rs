@@ -17,10 +17,16 @@ pub use {
 #[cfg(test)]
 mod tests {
     use crate::sm::{ProcessEvent, StateMachine};
+    use crate::vertex::{InitialPseudoState, TerminationPseudoState};
     use crate::{EntryVertex, ExitVertex};
     use std::marker::PhantomData;
 
     struct Locked;
+    impl<Event> EntryVertex<Event> for Locked {
+        fn entry(&mut self, _: &Event) {
+            println!("entry Locked!");
+        }
+    }
     impl<Event> ExitVertex<Event> for Locked {
         fn exit(&mut self, _: &Event) {
             println!("exit Locked!");
@@ -32,6 +38,11 @@ mod tests {
             println!("entry Unlocked!");
         }
     }
+    impl<Event> ExitVertex<Event> for Unlocked {
+        fn exit(&mut self, _: &Event) {
+            println!("exit Unlocked!");
+        }
+    }
 
     struct Push;
 
@@ -41,13 +52,33 @@ mod tests {
 
     #[test]
     fn test() {
-        let sm = StateMachine::new(Locked {}, ())
+        let sm = StateMachine::new(())
+            .add_vertex(Locked {})
             .add_vertex(Unlocked {})
-            .add_transition(beep, frunk::hlist![], PhantomData::<Unlocked>);
+            .add_transition(
+                |_: &mut InitialPseudoState, _: &mut (), _: &()| (),
+                frunk::hlist![],
+                PhantomData::<Locked>,
+            )
+            .add_transition(beep, frunk::hlist![], PhantomData::<Unlocked>)
+            .add_transition(
+                |_: &mut Unlocked, _: &mut (), _: &()| (),
+                frunk::hlist![],
+                PhantomData::<TerminationPseudoState>,
+            );
 
         let mut sm = sm;
-        ProcessEvent::process(&mut sm, &Push).ok().unwrap();
+        assert!(sm.is::<InitialPseudoState, _>());
+
+        ProcessEvent::process(&mut sm, &()).unwrap();
+        assert!(sm.is::<Locked, _>());
+
+        ProcessEvent::process(&mut sm, &Push).unwrap();
         assert!(sm.is::<Unlocked, _>());
-        let _current = sm.get_current_as::<Unlocked, _>().unwrap();
+
+        ProcessEvent::process(&mut sm, &()).unwrap();
+        assert!(sm.is::<TerminationPseudoState, _>());
+
+        assert!(ProcessEvent::process(&mut sm, &()).ok().is_none());
     }
 }
