@@ -1,6 +1,7 @@
+use crate::action::Action;
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
-use crate::transition::{Action, ITransition, Transition};
+use crate::transition::{ITransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::{h_cons, HList};

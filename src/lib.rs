@@ -1,3 +1,4 @@
+mod action;
 mod guard;
 mod hmap;
 mod sm;
@@ -5,7 +6,12 @@ mod transition;
 mod utils;
 mod vertex;
 
-pub use {guard::Guard, sm::StateMachine, transition::Action, vertex::Vertex};
+pub use {
+    action::Action,
+    guard::Guard,
+    sm::{ProcessEvent, StateMachine},
+    vertex::Vertex,
+};
 
 #[cfg(test)]
 mod tests {

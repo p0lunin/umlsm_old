@@ -1,23 +1,10 @@
 use crate::hmap::HMapNil;
-use crate::{Guard, Vertex};
+use crate::{Action, Guard, Vertex};
 use frunk::coproduct::{CNil, CoproductEmbedder};
 use frunk::hlist::Selector;
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
-
-pub trait Action<Source, Ctx, Event, Answer> {
-    fn trigger(&self, source: &mut Source, ctx: &mut Ctx, event: &Event) -> Answer;
-}
-
-impl<Source, Ctx, Event, F, Answer> Action<Source, Ctx, Event, Answer> for F
-where
-    F: Fn(&mut Source, &mut Ctx, &Event) -> Answer,
-{
-    fn trigger(&self, source: &mut Source, ctx: &mut Ctx, event: &Event) -> Answer {
-        self(source, ctx, event)
-    }
-}
 
 pub struct Transition<Source, Ctx, Event, Action, Guard, Target, Answer> {
     action: Action,
