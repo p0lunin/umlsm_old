@@ -100,11 +100,10 @@ impl<
         Rest,
         Indices,
         Other,
-        Action,
-        Guard,
         TransEvent,
         OtherTrans,
         Answer,
+        Trans,
     >
     ITransition<
         PhantomData<Source>,
@@ -113,23 +112,18 @@ impl<
         Target,
         Vertexes,
         Answer,
-        (TargetUnit, Indices, Other, OtherTrans),
-    >
-    for HCons<
-        Transition<Source, Ctx, TransEvent, Action, Guard, PhantomData<TargetUnit>, Answer>,
-        Rest,
-    >
+        (TargetUnit, Indices, Other, OtherTrans, TransEvent),
+    > for HCons<Trans, Rest>
 where
-    Transition<Source, Ctx, TransEvent, Action, Guard, PhantomData<TargetUnit>, Answer>:
-        ITransition<
-            PhantomData<Source>,
-            Ctx,
-            TransEvent,
-            Coproduct<PhantomData<TargetUnit>, CNil>,
-            Vertexes,
-            Answer,
-            OtherTrans,
-        >,
+    Trans: ITransition<
+        PhantomData<Source>,
+        Ctx,
+        TransEvent,
+        Coproduct<PhantomData<TargetUnit>, CNil>,
+        Vertexes,
+        Answer,
+        OtherTrans,
+    >,
     Coproduct<PhantomData<TargetUnit>, CNil>: CoproductEmbedder<Target, Indices>,
     Rest: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, Other>,
     Event: 'static,
