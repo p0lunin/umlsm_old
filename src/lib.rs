@@ -70,15 +70,15 @@ mod tests {
         let mut sm = sm;
         assert!(sm.is::<InitialPseudoState, _>());
 
-        ProcessEvent::process(&mut sm, &()).unwrap();
+        sm.process(&()).unwrap();
         assert!(sm.is::<Locked, _>());
 
-        ProcessEvent::process(&mut sm, &Push).unwrap();
+        sm.process(&Push).unwrap();
         assert!(sm.is::<Unlocked, _>());
 
-        ProcessEvent::process(&mut sm, &()).unwrap();
+        sm.process(&()).unwrap();
         assert!(sm.is::<TerminationPseudoState, _>());
 
-        assert!(ProcessEvent::process(&mut sm, &()).ok().is_none());
+        assert!(!ProcessEvent::process(&mut sm, &()).is_handled());
     }
 }

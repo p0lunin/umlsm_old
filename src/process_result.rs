@@ -22,6 +22,13 @@ impl<Answer> ProcessResult<Answer> {
             GuardReturnFalse => unreachable!("Expected handled result, found `GuardReturnFalse`"),
         }
     }
+
+    pub fn is_handled(&self) -> bool {
+        match &self {
+            ProcessResult::Handled(_) => true,
+            _ => false,
+        }
+    }
 }
 
 pub enum ProcessResultInner<Answer> {
