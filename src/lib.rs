@@ -1,22 +1,23 @@
-mod action;
+pub mod action;
 mod guard;
 mod hmap;
 mod process_result;
 mod sm;
 mod transition;
 mod utils;
-mod vertex;
+pub mod vertex;
 
 pub use {
     action::Action,
     guard::Guard,
     sm::{ProcessEvent, StateMachine},
-    vertex::{EmptyVertex, EntryVertex, ExitVertex},
+    vertex::{EntryVertex, ExitVertex},
 };
 
 #[cfg(test)]
 mod tests {
-    use crate::sm::{ProcessEvent, StateMachine};
+    use crate::action::EmptyAction;
+    use crate::sm::{CurrentStateIs, ProcessEvent, StateMachine};
     use crate::vertex::{InitialPseudoState, TerminationPseudoState};
     use crate::{EntryVertex, ExitVertex};
     use std::marker::PhantomData;
@@ -56,28 +57,28 @@ mod tests {
             .add_vertex(Locked {})
             .add_vertex(Unlocked {})
             .add_transition(
-                |_: &mut InitialPseudoState, _: &mut (), _: &()| (),
+                EmptyAction::<InitialPseudoState>::new(),
                 frunk::hlist![],
                 PhantomData::<Locked>,
             )
             .add_transition(beep, frunk::hlist![], PhantomData::<Unlocked>)
             .add_transition(
-                |_: &mut Unlocked, _: &mut (), _: &()| (),
+                EmptyAction::<Unlocked>::new(),
                 frunk::hlist![],
                 PhantomData::<TerminationPseudoState>,
             );
 
         let mut sm = sm;
-        assert!(sm.is::<InitialPseudoState, _>());
+        assert!(sm.is::<InitialPseudoState>());
 
         sm.process(&()).unwrap();
-        assert!(sm.is::<Locked, _>());
+        assert!(sm.is::<Locked>());
 
         sm.process(&Push).unwrap();
-        assert!(sm.is::<Unlocked, _>());
+        assert!(sm.is::<Unlocked>());
 
         sm.process(&()).unwrap();
-        assert!(sm.is::<TerminationPseudoState, _>());
+        assert!(sm.is::<TerminationPseudoState>());
 
         assert!(!ProcessEvent::process(&mut sm, &()).is_handled());
     }

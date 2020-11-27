@@ -110,16 +110,26 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer>
     }
 }
 
-impl<C, State, Vertexes, Transitions, Answer>
-    StateMachine<C, State, Vertexes, Transitions, Answer>
+pub trait CurrentStateIs<Idx, Inner> {
+    fn is<T>(&self) -> bool
+    where
+        Inner: CoproductSelector<PhantomData<T>, Idx>;
+}
+
+impl<C, State, Vertexes, Transitions, Answer, Idx> CurrentStateIs<Idx, C>
+    for StateMachine<C, State, Vertexes, Transitions, Answer>
 {
-    pub fn is<T, Idx>(&self) -> bool
+    fn is<T>(&self) -> bool
     where
         C: CoproductSelector<PhantomData<T>, Idx>,
     {
         self.current.get().is_some()
     }
+}
 
+impl<C, State, Vertexes, Transitions, Answer>
+    StateMachine<C, State, Vertexes, Transitions, Answer>
+{
     pub fn get_current<'a>(
         &'a self,
     ) -> <<C as CoprodWithoutPhantomData>::WithoutPD as CoprodWithRef<'a>>::CoprodWithRef
