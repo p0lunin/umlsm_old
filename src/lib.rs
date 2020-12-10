@@ -28,10 +28,19 @@ macro_rules! state_machine {
     (parse_action, $source:tt, $event:ty, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source), $event>::new() };
     (parse_action, $source:tt, $event:ty,$action:expr) => { $action };
 
+    (parse_action_loop, $source:tt, $event:ty, ) => { $crate::action::EmptyActionLoop::<$crate::state_machine!(parse_source, $source), $event>::new() };
+    (parse_action_loop, $source:tt, $event:ty,$action:expr) => { $action };
+
     (parse_err, ) => { () };
     (parse_err, $some:ty) => { $some };
 
-    (state = $state:expr $(, err = $err:ty)?, [$($vertex:expr),*], $($source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty),*) => {
+    (
+        state = $state:expr
+        $(, err = $err:ty)?,
+        [$($vertex:expr),*],
+        $(@$source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty,)*
+        $(loop: $($source2:tt + $event2:ty $([$($guard2:expr),*])? $(| $action2:expr)?),*)?
+    ) => {
         $crate::StateMachine::<_, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex))*
             $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
@@ -39,6 +48,10 @@ macro_rules! state_machine {
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
             ))*
+            $($(.add_loop::<_, _, $crate::state_machine!(parse_source, $source2), $event2, _, _>(
+                $crate::state_machine!(parse_action_loop, $source2, $event2, $($action2)?),
+                $crate::reexport::frunk::hlist![$($($guard2),*)?],
+            ))*)?
     };
 }
 
@@ -80,11 +93,12 @@ mod tests {
     #[test]
     fn test() {
         let sm = state_machine!(
-            state = (),
+            state = (), err = (),
             [Locked {}, Unlocked {}],
-            InitialPseudoState + ()   []        => Locked,
-            Locked             + Push    | beep => Unlocked,
-            Unlocked           + ()             => TerminationPseudoState
+
+            @InitialPseudoState + ()   []        => Locked,
+            @Locked             + Push    | beep => Unlocked,
+            @Unlocked           + ()             => TerminationPseudoState,
         );
 
         let mut sm = sm;
@@ -100,5 +114,40 @@ mod tests {
         assert!(sm.is::<TerminationPseudoState>());
 
         assert!(!ProcessEvent::process(&mut sm, &()).is_handled());
+    }
+
+    struct Looped;
+    impl EntryVertex for Looped {}
+    impl ExitVertex for Looped {}
+
+    struct AEvent;
+    struct BEvent;
+
+    fn a_event(_: &mut Looped, _: &mut (), _: &AEvent) {}
+    fn b_event(_: &mut Looped, _: &mut (), _: &BEvent, _: &mut TerminationPseudoState) {}
+
+    #[test]
+    fn test_looped() {
+        let mut sm = state_machine!(
+            state = (), err = (),
+            [Looped],
+
+            @InitialPseudoState + ()               => Looped,
+            @Looped             + BEvent | b_event => TerminationPseudoState,
+
+            loop:
+            Looped              + AEvent | a_event
+        );
+
+        sm.process(&()).unwrap();
+
+        sm.process(&AEvent).unwrap();
+        assert!(sm.is::<Looped>());
+
+        sm.process(&AEvent).unwrap();
+        assert!(sm.is::<Looped>());
+
+        sm.process(&BEvent).unwrap();
+        assert!(sm.is::<TerminationPseudoState>());
     }
 }

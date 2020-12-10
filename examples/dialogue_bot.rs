@@ -71,13 +71,13 @@ fn main() {
         state = (), err = String,
         [WaitForHello, WaitForName, WaitForAge { name: None }],
 
-        InitialPseudoState + ()                          | start => WaitForHello,
-        WaitForHello       + NewMessage [MesIs("hello")] | hello => WaitForName,
-        WaitForName        + NewMessage                  | name  => WaitForAge,
-        WaitForAge         + NewMessage [is_number]      | age   => WaitForHello,
-        WaitForHello       + Exit                        | exit  => TerminationPseudoState,
-        WaitForName        + Exit                        | exit  => TerminationPseudoState,
-        WaitForAge         + Exit                        | exit  => TerminationPseudoState
+        @InitialPseudoState + ()                          | start => WaitForHello,
+        @WaitForHello       + NewMessage [MesIs("hello")] | hello => WaitForName,
+        @WaitForName        + NewMessage                  | name  => WaitForAge,
+        @WaitForAge         + NewMessage [is_number]      | age   => WaitForHello,
+        @WaitForHello       + Exit                        | exit  => TerminationPseudoState,
+        @WaitForName        + Exit                        | exit  => TerminationPseudoState,
+        @WaitForAge         + Exit                        | exit  => TerminationPseudoState,
     );
     let mes = sm.process(&()).unwrap();
     println!("{}", mes);
