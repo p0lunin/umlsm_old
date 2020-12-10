@@ -1,11 +1,11 @@
 use std::marker::PhantomData;
 
 pub trait EntryVertex<Event> {
-    fn entry(&mut self, event: &Event);
+    fn entry(&mut self, event: &Event) {}
 }
 
-pub trait ExitVertex<Event> {
-    fn exit(&mut self, event: &Event);
+pub trait ExitVertex {
+    fn exit(&mut self) {}
 }
 
 pub struct EmptyVertex<T>(PhantomData<T>);
@@ -18,13 +18,11 @@ impl<T> EmptyVertex<T> {
 impl<E, T> EntryVertex<E> for EmptyVertex<T> {
     fn entry(&mut self, _: &E) {}
 }
-impl<E, T> ExitVertex<E> for EmptyVertex<T> {
-    fn exit(&mut self, _: &E) {}
-}
+impl<T> ExitVertex for EmptyVertex<T> { }
 
 pub struct InitialPseudoState;
-impl<E> ExitVertex<E> for InitialPseudoState {
-    fn exit(&mut self, _: &E) {}
+impl ExitVertex for InitialPseudoState {
+    fn exit(&mut self) {}
 }
 
 pub struct TerminationPseudoState;

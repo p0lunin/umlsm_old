@@ -1,7 +1,7 @@
 use crate::hmap::HMapNil;
 use crate::process_result::ProcessResultInner;
 use crate::{Action, EntryVertex, ExitVertex, Guard};
-use frunk::coproduct::{CNil, CoproductEmbedder};
+use frunk::coproduct::{CNil, CoproductEmbedder, CoprodInjector};
 use frunk::hlist::Selector;
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
@@ -38,23 +38,25 @@ pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, GErr, Other>
     ) -> ProcessResultInner<(Answer, Target), GErr>;
 }
 
-impl<Source, Ctx, Event, ActionT, GuardT, Target, Vertexes, Answer, GErr, Idx1, Idx2>
+impl<Source, Ctx, TransEvent, Event, ActionT, GuardT, Target, Vertexes, Answer, GErr, Idx1, Idx2>
     ITransition<
         PhantomData<Source>,
         Ctx,
         Event,
-        Coproduct<PhantomData<Target>, CNil>,
+        PhantomData<Target>,
         Vertexes,
         Answer,
         GErr,
         (Idx1, Idx2),
-    > for Transition<Source, Ctx, Event, ActionT, GuardT, PhantomData<Target>, Answer, GErr>
+    > for Transition<Source, Ctx, TransEvent, ActionT, GuardT, Target, Answer, GErr>
 where
     Vertexes: Selector<Source, Idx1> + Selector<Target, Idx2>,
-    Source: ExitVertex<Event>,
-    Target: EntryVertex<Event>,
-    ActionT: Action<Source, Ctx, Event, Answer>,
-    GuardT: Guard<Event, GErr>,
+    Source: ExitVertex,
+    Target: EntryVertex<TransEvent>,
+    ActionT: Action<Source, Ctx, TransEvent, Answer>,
+    GuardT: Guard<TransEvent, GErr>,
+    Event: 'static,
+    TransEvent: 'static,
 {
     fn process(
         &mut self,
@@ -62,17 +64,27 @@ where
         ctx: &mut Ctx,
         event: &Event,
         vertexes: &mut Vertexes,
-    ) -> ProcessResultInner<(Answer, Coproduct<PhantomData<Target>, CNil>), GErr> {
+    ) -> ProcessResultInner<(Answer, PhantomData<Target>), GErr> {
         use ProcessResultInner::*;
-        match self.guard.check(event) {
-            Ok(_) => {
-                let source = Selector::<Source, Idx1>::get_mut(vertexes);
-                source.exit(&event);
-                let answer = self.action.trigger(source, ctx, &event);
-                Selector::<Target, Idx2>::get_mut(vertexes).entry(&event);
-                HandledAndProcessEnd((answer, Coproduct::inject(PhantomData)))
+        if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
+            let event = unsafe { &*(event as *const Event as *const TransEvent) };
+
+            match self.guard.check(event) {
+                Ok(_) => {
+                    let source = Selector::<Source, Idx1>::get_mut(vertexes);
+                    let answer = self.action.trigger(source, ctx, &event);
+
+                    source.exit();
+
+                    let entry_vertex = Selector::<Target, Idx2>::get_mut(vertexes);
+                    entry_vertex.entry(event);
+                    HandledAndProcessEnd((answer, PhantomData))
+                }
+                Err(e) => GuardErr(e),
             }
-            Err(e) => GuardErr(e),
+        }
+        else {
+            ProcessResultInner::EventTypeNotSatisfy
         }
     }
 }
@@ -101,7 +113,6 @@ impl<
         Rest,
         Indices,
         Other,
-        TransEvent,
         OtherTrans,
         Answer,
         GErr,
@@ -115,23 +126,21 @@ impl<
         Vertexes,
         Answer,
         GErr,
-        (TargetUnit, Indices, Other, OtherTrans, TransEvent),
+        (TargetUnit, Indices, Other, OtherTrans),
     > for HCons<Trans, Rest>
 where
     Trans: ITransition<
         PhantomData<Source>,
         Ctx,
-        TransEvent,
-        Coproduct<PhantomData<TargetUnit>, CNil>,
+        Event,
+        PhantomData<TargetUnit>,
         Vertexes,
         Answer,
         GErr,
         OtherTrans,
     >,
-    Coproduct<PhantomData<TargetUnit>, CNil>: CoproductEmbedder<Target, Indices>,
+    Target: CoprodInjector<PhantomData<TargetUnit>, Indices>,
     Rest: ITransition<PhantomData<Source>, Ctx, Event, Target, Vertexes, Answer, GErr, Other>,
-    Event: 'static,
-    TransEvent: 'static,
 {
     fn process(
         &mut self,
@@ -140,12 +149,13 @@ where
         event: &Event,
         vertexes: &mut Vertexes,
     ) -> ProcessResultInner<(Answer, Target), GErr> {
-        if TypeId::of::<Event>() == TypeId::of::<TransEvent>() {
-            self.head
+        let res = self.head
                 .process(source, ctx, unsafe { std::mem::transmute(event) }, vertexes)
-                .map(|(a, t)| (a, t.embed()))
-        } else {
-            self.tail.process(source, ctx, event, vertexes)
+                .map(|(a, t)| (a, Target::inject(t)));
+
+        match res {
+            ProcessResultInner::EventTypeNotSatisfy => self.tail.process(source, ctx, event, vertexes),
+            _ => res
         }
     }
 }

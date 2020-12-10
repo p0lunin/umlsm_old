@@ -13,7 +13,7 @@ where
     }
 }
 
-pub struct EmptyAction<Source, Event = ()>(PhantomData<(Source, Event)>);
+pub struct EmptyAction<Source, Event>(PhantomData<(Source, Event)>);
 
 impl<Source, Event> EmptyAction<Source, Event> {
     pub fn new() -> Self {

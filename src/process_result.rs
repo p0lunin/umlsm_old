@@ -33,6 +33,7 @@ impl<Answer, GErr> ProcessResult<Answer, GErr> {
 
 pub enum ProcessResultInner<Answer, GErr> {
     HandledAndProcessNext,
+    EventTypeNotSatisfy,
     HandledAndProcessEnd(Answer),
     NoTransitions,
     GuardErr(GErr),
@@ -47,6 +48,7 @@ impl<Answer, GErr> Into<ProcessResult<Answer, GErr>> for ProcessResultInner<Answ
             HandledAndProcessEnd(a) => ProcessResult::Handled(a),
             NoTransitions => ProcessResult::NoTransitions,
             GuardErr(e) => ProcessResult::GuardErr(e),
+            EventTypeNotSatisfy => ProcessResult::NoTransitions,
         }
     }
 }
@@ -60,6 +62,7 @@ impl<A, GErr> ProcessResultInner<A, GErr> {
             HandledAndProcessEnd(a) => HandledAndProcessEnd(f(a)),
             NoTransitions => NoTransitions,
             GuardErr(e) => GuardErr(e),
+            EventTypeNotSatisfy => ProcessResultInner::EventTypeNotSatisfy
         }
     }
 }

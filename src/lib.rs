@@ -25,8 +25,8 @@ macro_rules! state_machine {
     (parse_source, $some:ty) => { $some };
     (parse_source, ($some:ty)) => { $some };
 
-    (parse_action, $source:tt, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source)>::new() };
-    (parse_action, $source:tt, $action:expr) => { $action };
+    (parse_action, $source:tt, $event:ty, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source), $event>::new() };
+    (parse_action, $source:tt, $event:ty,$action:expr) => { $action };
 
     (parse_err, ) => { () };
     (parse_err, $some:ty) => { $some };
@@ -35,7 +35,7 @@ macro_rules! state_machine {
         $crate::StateMachine::<_, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex))*
             $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
-                $crate::state_machine!(parse_action, $source, $($action)?),
+                $crate::state_machine!(parse_action, $source, $event, $($action)?),
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
             ))*
@@ -54,8 +54,8 @@ mod tests {
             println!("entry Locked!");
         }
     }
-    impl<Event> ExitVertex<Event> for Locked {
-        fn exit(&mut self, _: &Event) {
+    impl ExitVertex for Locked {
+        fn exit(&mut self) {
             println!("exit Locked!");
         }
     }
@@ -65,8 +65,8 @@ mod tests {
             println!("entry Unlocked!");
         }
     }
-    impl<Event> ExitVertex<Event> for Unlocked {
-        fn exit(&mut self, _: &Event) {
+    impl ExitVertex for Unlocked {
+        fn exit(&mut self) {
             println!("exit Unlocked!");
         }
     }

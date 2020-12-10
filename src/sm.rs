@@ -88,7 +88,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
     where
         Transitions: AppendInner<
             PhantomData<S>,
-            Transition<S, State, E, A, G, PhantomData<Tar>, Answer, GErr>,
+            Transition<S, State, E, A, G, Tar, Answer, GErr>,
             AppendIdx,
             Out,
         >,
@@ -190,6 +190,7 @@ where
             HandledAndProcessNext => ProcessEvent::process(self, &event),
             NoTransitions => ProcessResult::NoTransitions,
             GuardErr(ge) => ProcessResult::GuardErr(ge),
+            EventTypeNotSatisfy => ProcessResult::NoTransitions,
         }
     }
 }

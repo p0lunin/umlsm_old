@@ -1,33 +1,26 @@
-use umlsm::{
-    CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent, ProcessResult,
-};
+use umlsm::{CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent, ProcessResult, TerminationPseudoState, StateMachine};
 
 // Vertexes
 
 struct WaitForHello;
-impl ExitVertex<NewMessage> for WaitForHello {
-    fn exit(&mut self, _: &NewMessage) {}
-}
-impl EntryVertex<NewMessage> for WaitForHello {
-    fn entry(&mut self, _: &NewMessage) {}
-}
+impl EntryVertex<()> for WaitForHello {}
+impl ExitVertex for WaitForHello {}
+impl EntryVertex<NewMessage> for WaitForHello {}
 struct WaitForName;
-impl ExitVertex<NewMessage> for WaitForName {
-    fn exit(&mut self, _: &NewMessage) {}
-}
-impl EntryVertex<NewMessage> for WaitForName {
-    fn entry(&mut self, _: &NewMessage) {}
-}
+impl ExitVertex for WaitForName {}
+impl EntryVertex<NewMessage> for WaitForName {}
+#[derive(Debug)]
 struct WaitForAge {
     name: Option<String>,
 }
 impl EntryVertex<NewMessage> for WaitForAge {
     fn entry(&mut self, event: &NewMessage) {
-        self.name = Some(event.0.clone())
+        self.name = Some(event.0.clone());
+        //dbg!(self);
     }
 }
-impl ExitVertex<NewMessage> for WaitForAge {
-    fn exit(&mut self, _: &NewMessage) {
+impl ExitVertex for WaitForAge {
+    fn exit(&mut self) {
         self.name = None;
     }
 }
@@ -53,6 +46,7 @@ fn is_number(mes: &NewMessage) -> Result<(), String> {
 
 // Events
 struct NewMessage(String);
+struct Exit;
 
 // Actions
 fn start(_: &mut InitialPseudoState, _: &mut (), _: &()) -> String {
@@ -72,6 +66,9 @@ fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage) -> String {
         age
     )
 }
+fn exit<T>(_: &mut T, _: &mut (), _: &Exit) -> String {
+    "Bye, Bye!".to_string()
+}
 
 fn main() {
     #[rustfmt::skip]
@@ -81,24 +78,37 @@ fn main() {
 
         InitialPseudoState + ()                          | start => WaitForHello,
         WaitForHello       + NewMessage [MesIs("hello")] | hello => WaitForName,
-        WaitForName        + NewMessage [is_number]      | name  => WaitForAge,
-        WaitForAge         + NewMessage                  | age   => WaitForHello
+        WaitForName        + NewMessage                  | name  => WaitForAge,
+        WaitForAge         + NewMessage [is_number]      | age   => WaitForHello,
+        WaitForHello       + Exit                        | exit  => TerminationPseudoState,
+        WaitForName        + Exit                        | exit  => TerminationPseudoState,
+        WaitForAge         + Exit                        | exit  => TerminationPseudoState
     );
-    sm.process(&()).unwrap();
+    let mes = sm.process(&()).unwrap();
+    println!("{}", mes);
     assert!(sm.is::<WaitForHello>());
 
     repl("You > ", |input| {
-        let mes = NewMessage(input);
-        let answer = sm.process(&mes);
+        let answer = match input.as_str() {
+            "exit" => sm.process(&Exit),
+            _ => sm.process(&NewMessage(input))
+        };
         match answer {
-            ProcessResult::Handled(answer) => format!("Bot > {}", answer),
-            ProcessResult::GuardErr(e) => format!("Bot > {}", e),
+            ProcessResult::Handled(answer) => {
+                if sm.is::<TerminationPseudoState>() {
+                    Err(format!("Bot > {}", answer))
+                }
+                else {
+                    Ok(format!("Bot > {}", answer))
+                }
+            },
+            ProcessResult::GuardErr(e) => Ok(format!("Bot > {}", e)),
             _ => unreachable!(),
         }
     })
 }
 
-fn repl(s: &str, mut f: impl FnMut(String) -> String) {
+fn repl(s: &str, mut f: impl FnMut(String) -> Result<String, String>) {
     use std::io::Write;
     use std::{io, io::stdin};
 
@@ -108,9 +118,12 @@ fn repl(s: &str, mut f: impl FnMut(String) -> String) {
         let mut data = String::new();
         stdin().read_line(&mut data).expect("Error when read line");
         data.pop();
-        match data.as_str() {
-            "exit" => return,
-            _ => println!("{}", f(data)),
+        match f(data) {
+            Ok(d) => println!("{}", d),
+            Err(text) => {
+                println!("{}", text);
+                return
+            }
         }
     }
 }
