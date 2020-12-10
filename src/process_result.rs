@@ -62,7 +62,7 @@ impl<A, GErr> ProcessResultInner<A, GErr> {
             HandledAndProcessEnd(a) => HandledAndProcessEnd(f(a)),
             NoTransitions => NoTransitions,
             GuardErr(e) => GuardErr(e),
-            EventTypeNotSatisfy => ProcessResultInner::EventTypeNotSatisfy
+            EventTypeNotSatisfy => ProcessResultInner::EventTypeNotSatisfy,
         }
     }
 }

@@ -1,13 +1,13 @@
+use crate::action::ActionLoop;
 use crate::hmap::HMapNil;
 use crate::process_result::ProcessResultInner;
+use crate::utils::SelectorPointer;
 use crate::{Action, EntryVertex, ExitVertex, Guard};
 use frunk::coproduct::{CNil, CoprodInjector};
 use frunk::hlist::Selector;
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
-use crate::action::ActionLoop;
-use crate::utils::SelectorPointer;
 
 pub struct Transition<Source, Ctx, Event, Action, Guard, Target, Answer, GErr> {
     action: Action,
@@ -40,7 +40,20 @@ pub trait ITransition<Source, Ctx, Event, Target, Vertexes, Answer, GErr, Other>
     ) -> ProcessResultInner<(Answer, Target), GErr>;
 }
 
-impl<Source, Ctx, TransEvent, Event, ActionT, GuardT, Target, Vertexes, Answer, GErr, Idx1, Idx2>
+impl<
+        Source,
+        Ctx,
+        TransEvent,
+        Event,
+        ActionT,
+        GuardT,
+        Target,
+        Vertexes,
+        Answer,
+        GErr,
+        Idx1,
+        Idx2,
+    >
     ITransition<
         PhantomData<Source>,
         Ctx,
@@ -78,8 +91,10 @@ where
                     if TypeId::of::<Source>() == TypeId::of::<Target>() {
                         panic!("Transition must not have the same Source and Target vertices.");
                     }
-                    let source = unsafe { &mut *(SelectorPointer::<Source, _>::get_mut_ptr(vertexes)) };
-                    let target = unsafe { &mut *(SelectorPointer::<Target, _>::get_mut_ptr(vertexes)) };
+                    let source =
+                        unsafe { &mut *(SelectorPointer::<Source, _>::get_mut_ptr(vertexes)) };
+                    let target =
+                        unsafe { &mut *(SelectorPointer::<Target, _>::get_mut_ptr(vertexes)) };
                     let answer = self.action.trigger(source, ctx, &event, target);
 
                     source.exit();
@@ -88,8 +103,7 @@ where
                 }
                 Err(e) => GuardErr(e),
             }
-        }
-        else {
+        } else {
             ProcessResultInner::EventTypeNotSatisfy
         }
     }
@@ -155,13 +169,16 @@ where
         event: &Event,
         vertexes: &mut Vertexes,
     ) -> ProcessResultInner<(Answer, Target), GErr> {
-        let res = self.head
-                .process(source, ctx, unsafe { std::mem::transmute(event) }, vertexes)
-                .map(|(a, t)| (a, Target::inject(t)));
+        let res = self
+            .head
+            .process(source, ctx, unsafe { std::mem::transmute(event) }, vertexes)
+            .map(|(a, t)| (a, Target::inject(t)));
 
         match res {
-            ProcessResultInner::EventTypeNotSatisfy => self.tail.process(source, ctx, event, vertexes),
-            _ => res
+            ProcessResultInner::EventTypeNotSatisfy => {
+                self.tail.process(source, ctx, event, vertexes)
+            }
+            _ => res,
         }
     }
 }
@@ -287,8 +304,7 @@ where
                 }
                 Err(e) => GuardErr(e),
             }
-        }
-        else {
+        } else {
             ProcessResultInner::EventTypeNotSatisfy
         }
     }

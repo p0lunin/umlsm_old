@@ -1,4 +1,7 @@
-use umlsm::{CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent, ProcessResult, TerminationPseudoState,};
+use umlsm::{
+    CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent,
+    ProcessResult, TerminationPseudoState,
+};
 
 // Vertexes
 
@@ -86,17 +89,16 @@ fn main() {
     repl("You > ", |input| {
         let answer = match input.as_str() {
             "exit" => sm.process(&Exit),
-            _ => sm.process(&NewMessage(input))
+            _ => sm.process(&NewMessage(input)),
         };
         match answer {
             ProcessResult::Handled(answer) => {
                 if sm.is::<TerminationPseudoState>() {
                     Err(format!("Bot > {}", answer))
-                }
-                else {
+                } else {
                     Ok(format!("Bot > {}", answer))
                 }
-            },
+            }
             ProcessResult::GuardErr(e) => Ok(format!("Bot > {}", e)),
             _ => unreachable!(),
         }
@@ -117,7 +119,7 @@ fn repl(s: &str, mut f: impl FnMut(String) -> Result<String, String>) {
             Ok(d) => println!("{}", d),
             Err(text) => {
                 println!("{}", text);
-                return
+                return;
             }
         }
     }

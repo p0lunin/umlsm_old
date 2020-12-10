@@ -1,14 +1,26 @@
 use std::marker::PhantomData;
 
 pub trait Action<Source, Ctx, Event, Target, Answer> {
-    fn trigger(&self, source: &mut Source, ctx: &mut Ctx, event: &Event, target: &mut Target) -> Answer;
+    fn trigger(
+        &self,
+        source: &mut Source,
+        ctx: &mut Ctx,
+        event: &Event,
+        target: &mut Target,
+    ) -> Answer;
 }
 
 impl<Source, Ctx, Event, Target, F, Answer> Action<Source, Ctx, Event, Target, Answer> for F
 where
     F: Fn(&mut Source, &mut Ctx, &Event, &mut Target) -> Answer,
 {
-    fn trigger(&self, source: &mut Source, ctx: &mut Ctx, event: &Event, target: &mut Target) -> Answer {
+    fn trigger(
+        &self,
+        source: &mut Source,
+        ctx: &mut Ctx,
+        event: &Event,
+        target: &mut Target,
+    ) -> Answer {
         self(source, ctx, event, target)
     }
 }
@@ -21,7 +33,9 @@ impl<Source, Event> EmptyAction<Source, Event> {
     }
 }
 
-impl<Source, Ctx, Event, Target> Action<Source, Ctx, Event, Target, ()> for EmptyAction<Source, Event> {
+impl<Source, Ctx, Event, Target> Action<Source, Ctx, Event, Target, ()>
+    for EmptyAction<Source, Event>
+{
     fn trigger(&self, _: &mut Source, _: &mut Ctx, _: &Event, _: &mut Target) -> () {
         ()
     }

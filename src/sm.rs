@@ -2,14 +2,14 @@ use crate::action::{Action, ActionLoop};
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
 use crate::process_result::{ProcessResult, ProcessResultInner};
-use crate::transition::{ITransition, Transition, LoopTransition};
+use crate::transition::{ITransition, LoopTransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
 use crate::vertex::{InitialPseudoState, TerminationPseudoState};
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
-use std::marker::PhantomData;
 use std::any::TypeId;
+use std::marker::PhantomData;
 
 pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr> {
     pub current: Current,

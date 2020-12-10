@@ -18,7 +18,7 @@ impl<T> EmptyVertex<T> {
 impl<T> EntryVertex for EmptyVertex<T> {
     fn entry(&mut self) {}
 }
-impl<T> ExitVertex for EmptyVertex<T> { }
+impl<T> ExitVertex for EmptyVertex<T> {}
 
 pub struct InitialPseudoState;
 impl ExitVertex for InitialPseudoState {
