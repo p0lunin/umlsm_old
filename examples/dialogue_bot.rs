@@ -16,7 +16,6 @@ struct WaitForAge {
 impl EntryVertex<NewMessage> for WaitForAge {
     fn entry(&mut self, event: &NewMessage) {
         self.name = Some(event.0.clone());
-        //dbg!(self);
     }
 }
 impl ExitVertex for WaitForAge {
