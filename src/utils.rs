@@ -1,6 +1,7 @@
 use frunk::coproduct::CNil;
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
+use frunk::indices::{Here, There};
 
 pub trait CoprodWithoutPhantomData {
     type WithoutPD;
@@ -58,5 +59,33 @@ where
             Coproduct::Inl(_) => Coproduct::Inl(&self.head),
             Coproduct::Inr(r) => Coproduct::Inr(self.tail.get_refs(r)),
         }
+    }
+}
+
+pub trait SelectorPointer<T, Index> {
+    fn get_prt(&self) -> *const T;
+    fn get_mut_ptr(&mut self) -> *mut T;
+}
+
+impl<T, Rest> SelectorPointer<T, Here> for HCons<T, Rest> {
+    fn get_prt(&self) -> *const T {
+        &self.head
+    }
+
+    fn get_mut_ptr(&mut self) -> *mut T {
+        &mut self.head
+    }
+}
+
+impl<U, T, Rest, Idx> SelectorPointer<T, There<Idx>> for HCons<U, Rest>
+where
+    Rest: SelectorPointer<T, Idx>
+{
+    fn get_prt(&self) -> *const T {
+        self.tail.get_prt()
+    }
+
+    fn get_mut_ptr(&mut self) -> *mut T {
+        self.tail.get_mut_ptr()
     }
 }

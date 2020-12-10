@@ -1,23 +1,18 @@
-use umlsm::{CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent, ProcessResult, TerminationPseudoState, StateMachine};
+use umlsm::{CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent, ProcessResult, TerminationPseudoState,};
 
 // Vertexes
 
 struct WaitForHello;
-impl EntryVertex<()> for WaitForHello {}
+impl EntryVertex for WaitForHello {}
 impl ExitVertex for WaitForHello {}
-impl EntryVertex<NewMessage> for WaitForHello {}
 struct WaitForName;
 impl ExitVertex for WaitForName {}
-impl EntryVertex<NewMessage> for WaitForName {}
+impl EntryVertex for WaitForName {}
 #[derive(Debug)]
 struct WaitForAge {
     name: Option<String>,
 }
-impl EntryVertex<NewMessage> for WaitForAge {
-    fn entry(&mut self, event: &NewMessage) {
-        self.name = Some(event.0.clone());
-    }
-}
+impl EntryVertex for WaitForAge {}
 impl ExitVertex for WaitForAge {
     fn exit(&mut self) {
         self.name = None;
@@ -48,16 +43,17 @@ struct NewMessage(String);
 struct Exit;
 
 // Actions
-fn start(_: &mut InitialPseudoState, _: &mut (), _: &()) -> String {
+fn start(_: &mut InitialPseudoState, _: &mut (), _: &(), _: &mut WaitForHello) -> String {
     "Hello! I am dialogue bot. Let's start! Say hello to me.".to_string()
 }
-fn hello(_: &mut WaitForHello, _: &mut (), _: &NewMessage) -> String {
+fn hello(_: &mut WaitForHello, _: &mut (), _: &NewMessage, _: &mut WaitForName) -> String {
     "Hello! How is your name?".to_string()
 }
-fn name(_: &mut WaitForName, _: &mut (), mes: &NewMessage) -> String {
+fn name(_: &mut WaitForName, _: &mut (), mes: &NewMessage, age: &mut WaitForAge) -> String {
+    age.name = Some(mes.0.clone());
     format!("Oh, your name is {}! How is your age?", mes.0)
 }
-fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage) -> String {
+fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage, _: &mut WaitForHello) -> String {
     let age: u32 = mes.0.parse().unwrap();
     format!(
         "Oh, your name is {} and age is {}!",
@@ -65,7 +61,7 @@ fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage) -> String {
         age
     )
 }
-fn exit<T>(_: &mut T, _: &mut (), _: &Exit) -> String {
+fn exit<T>(_: &mut T, _: &mut (), _: &Exit, _: &mut TerminationPseudoState) -> String {
     "Bye, Bye!".to_string()
 }
 

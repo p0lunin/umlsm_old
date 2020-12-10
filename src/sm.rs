@@ -1,14 +1,15 @@
-use crate::action::Action;
+use crate::action::{Action, ActionLoop};
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
 use crate::process_result::{ProcessResult, ProcessResultInner};
-use crate::transition::{ITransition, Transition};
+use crate::transition::{ITransition, Transition, LoopTransition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
 use crate::vertex::{InitialPseudoState, TerminationPseudoState};
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
+use std::any::TypeId;
 
 pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr> {
     pub current: Current,
@@ -92,7 +93,42 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             AppendIdx,
             Out,
         >,
-        A: Action<S, State, E, Answer>,
+        A: Action<S, State, E, Tar, Answer>,
+        G: Guard<E, GErr>,
+        S: 'static,
+        Tar: 'static,
+    {
+        if TypeId::of::<S>() == TypeId::of::<Tar>() {
+            panic!("If you want to add loop transition, use StateMachine::add_loop instead.")
+        }
+        let StateMachine {
+            current,
+            state,
+            vertexes,
+            transitions,
+            phantom,
+        } = self;
+        StateMachine {
+            current,
+            state,
+            vertexes,
+            transitions: transitions.append_inner(Transition::new(action, guard)),
+            phantom,
+        }
+    }
+    pub fn add_loop<A, G, Vertex, E, AppendIdx, Out>(
+        self,
+        action: A,
+        guard: G,
+    ) -> StateMachine<C, State, Vertexes, HMap<Out>, Answer, GErr>
+    where
+        Transitions: AppendInner<
+            PhantomData<Vertex>,
+            LoopTransition<Vertex, State, E, A, G, Answer, GErr>,
+            AppendIdx,
+            Out,
+        >,
+        A: ActionLoop<Vertex, State, E, Answer>,
         G: Guard<E, GErr>,
     {
         let StateMachine {
@@ -106,7 +142,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current,
             state,
             vertexes,
-            transitions: transitions.append_inner(Transition::new(action, guard)),
+            transitions: transitions.append_inner(LoopTransition::new(action, guard)),
             phantom,
         }
     }

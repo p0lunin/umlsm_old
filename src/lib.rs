@@ -49,8 +49,8 @@ mod tests {
     use crate::{EntryVertex, ExitVertex};
 
     struct Locked;
-    impl<Event> EntryVertex<Event> for Locked {
-        fn entry(&mut self, _: &Event) {
+    impl EntryVertex for Locked {
+        fn entry(&mut self) {
             println!("entry Locked!");
         }
     }
@@ -60,8 +60,8 @@ mod tests {
         }
     }
     struct Unlocked;
-    impl<Event> EntryVertex<Event> for Unlocked {
-        fn entry(&mut self, _: &Event) {
+    impl EntryVertex for Unlocked {
+        fn entry(&mut self) {
             println!("entry Unlocked!");
         }
     }
@@ -73,7 +73,7 @@ mod tests {
 
     struct Push;
 
-    fn beep(_: &mut Locked, _: &mut (), _: &Push) {
+    fn beep(_: &mut Locked, _: &mut (), _: &Push, _: &mut Unlocked) {
         println!("beep!");
     }
 
