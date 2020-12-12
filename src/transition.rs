@@ -264,16 +264,8 @@ where
 }
 
 impl<Vertex, Ctx, TransEvent, Event, ActionT, GuardT, Vertexes, Answer, GErr, Idx1>
-    ITransition<
-        PhantomData<Vertex>,
-        Ctx,
-        Event,
-        PhantomData<Vertex>,
-        Vertexes,
-        Answer,
-        GErr,
-        Idx1,
-    > for LoopTransition<Vertex, Ctx, TransEvent, ActionT, GuardT, Answer, GErr>
+    ITransition<PhantomData<Vertex>, Ctx, Event, PhantomData<Vertex>, Vertexes, Answer, GErr, Idx1>
+    for LoopTransition<Vertex, Ctx, TransEvent, ActionT, GuardT, Answer, GErr>
 where
     Vertexes: Selector<Vertex, Idx1>,
     Vertex: ExitVertex + EntryVertex,

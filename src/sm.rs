@@ -4,14 +4,14 @@ use crate::hmap::{AppendInner, HMap, HMapNil};
 use crate::process_result::{ProcessResult, ProcessResultInner};
 use crate::transition::{ITransition, LoopTransition, Transition};
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
+use crate::vert_handler::{EmptyVertexHandler, ProcessResultSubstate, VertexHandler};
 use crate::vertex::{InitialPseudoState, TerminationPseudoState};
+use crate::ProcessEvent;
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
 use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
-use crate::vert_handler::{VertexHandler, ProcessResultSubstate, EmptyVertexHandler};
-use crate::ProcessEvent;
 
 pub struct StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr> {
     pub current: Current,
@@ -59,7 +59,7 @@ impl<C, State, Vertexes: HList, VertHandlers: HList, Transitions: HList, Answer,
     pub fn add_vertex<V, VertHandler, Inds>(
         self,
         vertex: V,
-        vertex_handler: VertHandler
+        vertex_handler: VertHandler,
     ) -> StateMachine<
         Coproduct<PhantomData<V>, C>,
         State,
@@ -70,7 +70,7 @@ impl<C, State, Vertexes: HList, VertHandlers: HList, Transitions: HList, Answer,
         GErr,
     >
     where
-        C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>
+        C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>,
     {
         let StateMachine {
             current,
@@ -213,16 +213,19 @@ impl<C, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
 }
 
 impl<C, State, Vertexes, VertHandlers, Transitions, E, OtherTR, Answer, GErr, OtherVH>
-    ProcessEvent<E, Answer, GErr, (OtherTR, OtherVH,)>
+    ProcessEvent<E, Answer, GErr, (OtherTR, OtherVH)>
     for StateMachine<C, State, Vertexes, VertHandlers, HMap<Transitions>, Answer, GErr>
 where
     Transitions: ITransition<C, State, E, C, Vertexes, Answer, GErr, OtherTR>,
-    VertHandlers: VertexHandler<Vertexes, C, E, Answer, GErr, OtherVH>
+    VertHandlers: VertexHandler<Vertexes, C, E, Answer, GErr, OtherVH>,
 {
     fn process(&mut self, event: &E) -> ProcessResult<Answer, GErr> {
         use ProcessResultInner::*;
 
-        match self.vertices_handlers.process(&mut self.vertexes, &self.current, event) {
+        match self
+            .vertices_handlers
+            .process(&mut self.vertexes, &self.current, event)
+        {
             ProcessResultSubstate::Handled(answer) => return ProcessResult::Handled(answer),
             ProcessResultSubstate::NoTransitions => return ProcessResult::NoTransitions,
             ProcessResultSubstate::GuardErr(ge) => return ProcessResult::GuardErr(ge),

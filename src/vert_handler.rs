@@ -1,12 +1,10 @@
 use crate::vertex::StateMachineVertex;
-use crate::{CurrentStateIs, TerminationPseudoState, StateMachine, ProcessEvent, ProcessResult};
-use frunk::{HNil, HCons, Coproduct};
+use crate::{CurrentStateIs, ProcessEvent, TerminationPseudoState};
+use frunk::coproduct::{CNil, CoproductSelector};
+use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
-use frunk::coproduct::{CoproductSelector, CNil};
-use std::any::TypeId;
-use crate::process_event::{EmptyPCE};
 
-pub trait VertexHandler<Vertex, Idx, Event, Answer, GErr, Other, > {
+pub trait VertexHandler<Vertex, Idx, Event, Answer, GErr, Other> {
     fn process(
         &mut self,
         vertex: &mut Vertex,
@@ -23,25 +21,42 @@ pub enum ProcessResultSubstate<Answer, GErr> {
 }
 
 pub struct EmptyVertexHandler;
-impl<Vertex, Event, Answer, GErr> VertexHandler<Vertex, (), Event, Answer, GErr, ()> for EmptyVertexHandler {
-    fn process(&mut self, _: &mut Vertex, _: &(), _: &Event) -> ProcessResultSubstate<Answer, GErr> {
+impl<Vertex, Event, Answer, GErr> VertexHandler<Vertex, (), Event, Answer, GErr, ()>
+    for EmptyVertexHandler
+{
+    fn process(
+        &mut self,
+        _: &mut Vertex,
+        _: &(),
+        _: &Event,
+    ) -> ProcessResultSubstate<Answer, GErr> {
         ProcessResultSubstate::MustLeaveState
     }
 }
 
 pub struct SubStateMachineVertexHandler;
 impl<C, IDX, SM, Entry, Exit, Event, Answer, GErr, Idx, Other>
-VertexHandler<StateMachineVertex<IDX, SM, Entry, Exit>, (), Event, Answer, GErr, (Idx, Other, C)>
-for SubStateMachineVertexHandler
+    VertexHandler<
+        StateMachineVertex<IDX, SM, Entry, Exit>,
+        (),
+        Event,
+        Answer,
+        GErr,
+        (Idx, Other, C),
+    > for SubStateMachineVertexHandler
 where
     C: CoproductSelector<PhantomData<TerminationPseudoState>, Idx>,
-    SM: CurrentStateIs<Idx, C> + ProcessEvent<Event, Answer, GErr, Other>
+    SM: CurrentStateIs<Idx, C> + ProcessEvent<Event, Answer, GErr, Other>,
 {
-    fn process(&mut self, sub: &mut StateMachineVertex<IDX, SM, Entry, Exit>, _: &(), event: &Event) -> ProcessResultSubstate<Answer, GErr> {
+    fn process(
+        &mut self,
+        sub: &mut StateMachineVertex<IDX, SM, Entry, Exit>,
+        _: &(),
+        event: &Event,
+    ) -> ProcessResultSubstate<Answer, GErr> {
         if sub.sm.is::<TerminationPseudoState>() {
             ProcessResultSubstate::MustLeaveState
-        }
-        else {
+        } else {
             use crate::process_result::ProcessResult::*;
 
             match sub.sm.process(event) {
@@ -54,27 +69,49 @@ where
 }
 
 impl<Vertex, Event, Answer, GErr> VertexHandler<Vertex, CNil, Event, Answer, GErr, ()> for HNil {
-    fn process(&mut self, _: &mut Vertex, idx: &CNil, _: &Event) -> ProcessResultSubstate<Answer, GErr> {
+    fn process(
+        &mut self,
+        _: &mut Vertex,
+        idx: &CNil,
+        _: &Event,
+    ) -> ProcessResultSubstate<Answer, GErr> {
         match *idx {}
     }
 }
 
-impl<Vertex, IdxRest, Vertices, Event, Answer, GErr, VertHandler, VertHandlers, Other, OtherRest>
-VertexHandler<HCons<Vertex, Vertices>, Coproduct<PhantomData<Vertex>, IdxRest>, Event, Answer, GErr, (Other, OtherRest)>
-for
-HCons<VertHandler, VertHandlers>
+impl<
+        Vertex,
+        IdxRest,
+        Vertices,
+        Event,
+        Answer,
+        GErr,
+        VertHandler,
+        VertHandlers,
+        Other,
+        OtherRest,
+    >
+    VertexHandler<
+        HCons<Vertex, Vertices>,
+        Coproduct<PhantomData<Vertex>, IdxRest>,
+        Event,
+        Answer,
+        GErr,
+        (Other, OtherRest),
+    > for HCons<VertHandler, VertHandlers>
 where
     VertHandler: VertexHandler<Vertex, (), Event, Answer, GErr, Other>,
     VertHandlers: VertexHandler<Vertices, IdxRest, Event, Answer, GErr, OtherRest>,
 {
-    fn process(&mut self, vertices: &mut HCons<Vertex, Vertices>, idx: &Coproduct<PhantomData<Vertex>, IdxRest>, event: &Event) -> ProcessResultSubstate<Answer, GErr> {
-        use ProcessResultSubstate::*;
-
+    fn process(
+        &mut self,
+        vertices: &mut HCons<Vertex, Vertices>,
+        idx: &Coproduct<PhantomData<Vertex>, IdxRest>,
+        event: &Event,
+    ) -> ProcessResultSubstate<Answer, GErr> {
         match idx {
-            Coproduct::Inl(_) => {
-                self.head.process(&mut vertices.head, &(), event)
-            }
-            Coproduct::Inr(right) => self.tail.process(&mut vertices.tail, right, event)
+            Coproduct::Inl(_) => self.head.process(&mut vertices.head, &(), event),
+            Coproduct::Inr(right) => self.tail.process(&mut vertices.tail, right, event),
         }
     }
 }

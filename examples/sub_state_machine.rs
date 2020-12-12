@@ -1,16 +1,8 @@
 use umlsm::{
-    CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent,
-    ProcessResult, TerminationPseudoState,
-    vertex::StateMachineVertex,
+    vertex::StateMachineVertex, CurrentStateIs, InitialPseudoState, ProcessEvent,
+    TerminationPseudoState,
 };
 
-// Vertexes
-
-struct State1;
-impl EntryVertex for State1 {}
-impl ExitVertex for State1 {}
-
-// Events
 struct MyEvent;
 struct MyEvent2;
 

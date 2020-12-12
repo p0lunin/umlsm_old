@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use crate::StateMachine;
+use std::marker::PhantomData;
 
 pub trait EntryVertex {
     fn entry(&mut self) {}
@@ -32,31 +32,62 @@ impl EntryVertex for TerminationPseudoState {
 }
 
 pub struct StateMachineVertex<IDX, SM, Entry, Exit> {
-    pub (crate) sm: SM,
-    pub (crate) entry: Entry,
-    pub (crate) exit: Exit,
-    pub (crate) phantom: PhantomData<IDX>,
+    pub(crate) sm: SM,
+    pub(crate) entry: Entry,
+    pub(crate) exit: Exit,
+    pub(crate) phantom: PhantomData<IDX>,
 }
 
 impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit>
-StateMachineVertex<IDX, StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>, Entry, Exit>
+    StateMachineVertex<
+        IDX,
+        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        Entry,
+        Exit,
+    >
 {
-    pub fn new(sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>, entry: Entry, exit: Exit) -> Self {
-        StateMachineVertex { sm, entry, exit, phantom: PhantomData }
+    pub fn new(
+        sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        entry: Entry,
+        exit: Exit,
+    ) -> Self {
+        StateMachineVertex {
+            sm,
+            entry,
+            exit,
+            phantom: PhantomData,
+        }
     }
 }
 
 impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
-StateMachineVertex<IDX, StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>, EmptyVertex<()>, EmptyVertex<()>>
+    StateMachineVertex<
+        IDX,
+        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        EmptyVertex<()>,
+        EmptyVertex<()>,
+    >
 {
-    pub fn empty(sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>) -> Self {
-        StateMachineVertex { sm, entry: EmptyVertex::new(), exit: EmptyVertex::new(), phantom: PhantomData }
+    pub fn empty(
+        sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+    ) -> Self {
+        StateMachineVertex {
+            sm,
+            entry: EmptyVertex::new(),
+            exit: EmptyVertex::new(),
+            phantom: PhantomData,
+        }
     }
 }
 
 impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit>
-EntryVertex for
-StateMachineVertex<IDX, StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>, Entry, Exit>
+    EntryVertex
+    for StateMachineVertex<
+        IDX,
+        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        Entry,
+        Exit,
+    >
 where
     Entry: EntryVertex,
 {
@@ -65,11 +96,15 @@ where
     }
 }
 
-impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit>
-ExitVertex for
-StateMachineVertex<IDX, StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>, Entry, Exit>
+impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit> ExitVertex
+    for StateMachineVertex<
+        IDX,
+        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        Entry,
+        Exit,
+    >
 where
-    Exit: ExitVertex
+    Exit: ExitVertex,
 {
     fn exit(&mut self) {
         self.exit.exit()

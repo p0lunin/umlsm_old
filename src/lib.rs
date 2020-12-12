@@ -1,20 +1,20 @@
 pub mod action;
 mod guard;
 mod hmap;
+mod process_event;
 pub mod process_result;
 mod sm;
 mod transition;
 mod utils;
-pub mod vertex;
 pub mod vert_handler;
-mod process_event;
+pub mod vertex;
 
 pub use {
     action::Action,
     guard::Guard,
+    process_event::ProcessEvent,
     process_result::ProcessResult,
     sm::{CurrentStateIs, StateMachine},
-    process_event::{ProcessEvent},
     vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState},
 };
 
@@ -63,7 +63,7 @@ macro_rules! state_machine {
 
 #[cfg(test)]
 mod tests {
-    use crate::sm::{CurrentStateIs};
+    use crate::sm::CurrentStateIs;
     use crate::vertex::{InitialPseudoState, TerminationPseudoState};
     use crate::{EntryVertex, ExitVertex, ProcessEvent};
 
