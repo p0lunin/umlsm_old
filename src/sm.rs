@@ -10,11 +10,14 @@ use frunk::hlist::{h_cons, HList};
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
+use crate::vert_handler::{VertexHandler, ProcessResultSubstate, EmptyVertexHandler};
+use crate::ProcessEvent;
 
-pub struct StateMachine<Current, State, Vertexes, Transitions, Answer, GErr> {
+pub struct StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr> {
     pub current: Current,
     pub state: State,
     pub vertexes: Vertexes,
+    pub vertices_handlers: VertHandlers,
     pub transitions: Transitions,
     pub phantom: PhantomData<(Answer, GErr)>,
 }
@@ -27,6 +30,7 @@ impl<State, Answer, GErr>
         >,
         State,
         HCons<InitialPseudoState, HCons<TerminationPseudoState, HNil>>,
+        HCons<EmptyVertexHandler, HCons<EmptyVertexHandler, HNil>>,
         HMap<
             HCons<
                 (PhantomData<InitialPseudoState>, HNil),
@@ -42,33 +46,37 @@ impl<State, Answer, GErr>
             current: Coproduct::inject(PhantomData::<InitialPseudoState>),
             state,
             vertexes: h_cons(InitialPseudoState, h_cons(TerminationPseudoState, HNil)),
+            vertices_handlers: h_cons(EmptyVertexHandler, h_cons(EmptyVertexHandler, HNil)),
             transitions: HMap::new().add(PhantomData, HNil).add(PhantomData, HNil),
             phantom: PhantomData,
         }
     }
 }
 
-impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
-    StateMachine<C, State, Vertexes, HMap<Transitions>, Answer, GErr>
+impl<C, State, Vertexes: HList, VertHandlers: HList, Transitions: HList, Answer, GErr>
+    StateMachine<C, State, Vertexes, VertHandlers, HMap<Transitions>, Answer, GErr>
 {
-    pub fn add_vertex<V, Inds>(
+    pub fn add_vertex<V, VertHandler, Inds>(
         self,
         vertex: V,
+        vertex_handler: VertHandler
     ) -> StateMachine<
         Coproduct<PhantomData<V>, C>,
         State,
         HCons<V, Vertexes>,
+        HCons<VertHandler, VertHandlers>,
         HMap<HCons<(PhantomData<V>, HNil), Transitions>>,
         Answer,
         GErr,
     >
     where
-        C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>,
+        C: CoproductEmbedder<Coproduct<PhantomData<V>, C>, Inds>
     {
         let StateMachine {
             current,
             state,
             vertexes,
+            vertices_handlers,
             transitions,
             phantom,
         } = self;
@@ -76,6 +84,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current: current.embed(),
             state,
             vertexes: vertexes.prepend(vertex),
+            vertices_handlers: vertices_handlers.prepend(vertex_handler),
             transitions: transitions.add(PhantomData, HNil),
             phantom,
         }
@@ -85,7 +94,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
         action: A,
         guard: G,
         _target: PhantomData<Tar>,
-    ) -> StateMachine<C, State, Vertexes, HMap<Out>, Answer, GErr>
+    ) -> StateMachine<C, State, Vertexes, VertHandlers, HMap<Out>, Answer, GErr>
     where
         Transitions: AppendInner<
             PhantomData<S>,
@@ -105,6 +114,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current,
             state,
             vertexes,
+            vertices_handlers,
             transitions,
             phantom,
         } = self;
@@ -112,6 +122,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current,
             state,
             vertexes,
+            vertices_handlers,
             transitions: transitions.append_inner(Transition::new(action, guard)),
             phantom,
         }
@@ -120,7 +131,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
         self,
         action: A,
         guard: G,
-    ) -> StateMachine<C, State, Vertexes, HMap<Out>, Answer, GErr>
+    ) -> StateMachine<C, State, Vertexes, VertHandlers, HMap<Out>, Answer, GErr>
     where
         Transitions: AppendInner<
             PhantomData<Vertex>,
@@ -135,6 +146,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current,
             state,
             vertexes,
+            vertices_handlers,
             transitions,
             phantom,
         } = self;
@@ -142,6 +154,7 @@ impl<C, State, Vertexes: HList, Transitions: HList, Answer, GErr>
             current,
             state,
             vertexes,
+            vertices_handlers,
             transitions: transitions.append_inner(LoopTransition::new(action, guard)),
             phantom,
         }
@@ -154,8 +167,8 @@ pub trait CurrentStateIs<Idx, Inner> {
         Inner: CoproductSelector<PhantomData<T>, Idx>;
 }
 
-impl<C, State, Vertexes, Transitions, Answer, Idx, GErr> CurrentStateIs<Idx, C>
-    for StateMachine<C, State, Vertexes, Transitions, Answer, GErr>
+impl<C, State, Vertexes, VertHandlers, Transitions, Answer, Idx, GErr> CurrentStateIs<Idx, C>
+    for StateMachine<C, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
 {
     fn is<T>(&self) -> bool
     where
@@ -165,8 +178,8 @@ impl<C, State, Vertexes, Transitions, Answer, Idx, GErr> CurrentStateIs<Idx, C>
     }
 }
 
-impl<C, State, Vertexes, Transitions, Answer, GErr>
-    StateMachine<C, State, Vertexes, Transitions, Answer, GErr>
+impl<C, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
+    StateMachine<C, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
 {
     pub fn get_current<'a>(
         &'a self,
@@ -199,19 +212,22 @@ impl<C, State, Vertexes, Transitions, Answer, GErr>
     }
 }
 
-pub trait ProcessEvent<E, Answer, GErr, Other> {
-    fn process(&mut self, event: &E) -> ProcessResult<Answer, GErr>;
-}
-
-impl<C, State, Vertexes, Transitions, E, OtherTR, Answer, GErr>
-    ProcessEvent<E, Answer, GErr, (OtherTR,)>
-    for StateMachine<C, State, Vertexes, HMap<Transitions>, Answer, GErr>
+impl<C, State, Vertexes, VertHandlers, Transitions, E, OtherTR, Answer, GErr, OtherVH>
+    ProcessEvent<E, Answer, GErr, (OtherTR, OtherVH,)>
+    for StateMachine<C, State, Vertexes, VertHandlers, HMap<Transitions>, Answer, GErr>
 where
     Transitions: ITransition<C, State, E, C, Vertexes, Answer, GErr, OtherTR>,
+    VertHandlers: VertexHandler<Vertexes, C, E, Answer, GErr, OtherVH>
 {
     fn process(&mut self, event: &E) -> ProcessResult<Answer, GErr> {
         use ProcessResultInner::*;
 
+        match self.vertices_handlers.process(&mut self.vertexes, &self.current, event) {
+            ProcessResultSubstate::Handled(answer) => return ProcessResult::Handled(answer),
+            ProcessResultSubstate::NoTransitions => return ProcessResult::NoTransitions,
+            ProcessResultSubstate::GuardErr(ge) => return ProcessResult::GuardErr(ge),
+            ProcessResultSubstate::MustLeaveState => {}
+        };
         let result = self.transitions.hlist.process(
             &mut self.current,
             &mut self.state,

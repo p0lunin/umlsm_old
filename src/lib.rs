@@ -6,12 +6,15 @@ mod sm;
 mod transition;
 mod utils;
 pub mod vertex;
+pub mod vert_handler;
+mod process_event;
 
 pub use {
     action::Action,
     guard::Guard,
     process_result::ProcessResult,
-    sm::{CurrentStateIs, ProcessEvent, StateMachine},
+    sm::{CurrentStateIs, StateMachine},
+    process_event::{ProcessEvent},
     vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState},
 };
 
@@ -34,15 +37,18 @@ macro_rules! state_machine {
     (parse_err, ) => { () };
     (parse_err, $some:ty) => { $some };
 
+    (parse_v_type, ) => { $crate::vert_handler::EmptyVertexHandler };
+    (parse_v_type, Sub) => { $crate::vert_handler::SubStateMachineVertexHandler };
+
     (
         state = $state:expr
         $(, err = $err:ty)?,
-        [$($vertex:expr),*],
+        [$($(@$type:ident)?$vertex:expr),*],
         $(@$source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty,)*
         $(loop: $($source2:tt + $event2:ty $([$($guard2:expr),*])? $(| $action2:expr)?),*)?
     ) => {
-        $crate::StateMachine::<_, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
-            $(.add_vertex($vertex))*
+        $crate::StateMachine::<_, _, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
+            $(.add_vertex($vertex, $crate::state_machine!(parse_v_type, $($type)?)))*
             $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
                 $crate::state_machine!(parse_action, $source, $event, $($action)?),
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
@@ -57,9 +63,9 @@ macro_rules! state_machine {
 
 #[cfg(test)]
 mod tests {
-    use crate::sm::{CurrentStateIs, ProcessEvent};
+    use crate::sm::{CurrentStateIs};
     use crate::vertex::{InitialPseudoState, TerminationPseudoState};
-    use crate::{EntryVertex, ExitVertex};
+    use crate::{EntryVertex, ExitVertex, ProcessEvent};
 
     struct Locked;
     impl EntryVertex for Locked {

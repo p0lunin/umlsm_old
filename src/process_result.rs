@@ -36,6 +36,7 @@ pub enum ProcessResultInner<Answer, GErr> {
     EventTypeNotSatisfy,
     HandledAndProcessEnd(Answer),
     NoTransitions,
+
     GuardErr(GErr),
 }
 

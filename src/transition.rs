@@ -272,7 +272,7 @@ impl<Vertex, Ctx, TransEvent, Event, ActionT, GuardT, Vertexes, Answer, GErr, Id
         Vertexes,
         Answer,
         GErr,
-        (Idx1),
+        Idx1,
     > for LoopTransition<Vertex, Ctx, TransEvent, ActionT, GuardT, Answer, GErr>
 where
     Vertexes: Selector<Vertex, Idx1>,
@@ -309,9 +309,3 @@ where
         }
     }
 }
-
-/*
-pub struct StateMachineTransition<Current, > {
-    sm: StateMachine<>
-}
-*/
