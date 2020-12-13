@@ -1,8 +1,9 @@
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData};
+use crate::TerminationPseudoState;
 use frunk::coproduct::CNil;
 use frunk::hlist::{h_cons, HList, Selector};
 use frunk::indices::{Here, There};
-use frunk::{Coproduct, HCons};
+use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
 
 pub struct HMap<H> {

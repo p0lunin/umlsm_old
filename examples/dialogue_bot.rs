@@ -1,5 +1,5 @@
 use umlsm::{
-    CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent,
+    Action, CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent,
     ProcessResult, TerminationPseudoState,
 };
 
@@ -64,8 +64,19 @@ fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage, _: &mut WaitForHell
         age
     )
 }
-fn exit<T>(_: &mut T, _: &mut (), _: &Exit, _: &mut TerminationPseudoState) -> String {
-    "Bye, Bye!".to_string()
+
+#[derive(Clone)]
+struct ExitAction;
+impl<Source> Action<Source, (), Exit, TerminationPseudoState, String> for ExitAction {
+    fn trigger(
+        &self,
+        _: &mut Source,
+        _: &mut (),
+        _: &Exit,
+        _: &mut TerminationPseudoState,
+    ) -> String {
+        "Bye, Bye!".to_string()
+    }
 }
 
 fn main() {
@@ -74,13 +85,12 @@ fn main() {
         state = (), err = String,
         [WaitForHello, WaitForName, WaitForAge { name: None }],
 
-        @InitialPseudoState + ()                          | start => WaitForHello,
-        @WaitForHello       + NewMessage [MesIs("hello")] | hello => WaitForName,
-        @WaitForName        + NewMessage                  | name  => WaitForAge,
-        @WaitForAge         + NewMessage [is_number]      | age   => WaitForHello,
-        @WaitForHello       + Exit                        | exit  => TerminationPseudoState,
-        @WaitForName        + Exit                        | exit  => TerminationPseudoState,
-        @WaitForAge         + Exit                        | exit  => TerminationPseudoState,
+        @InitialPseudoState + ()                          | start       => WaitForHello,
+        @WaitForHello       + NewMessage [MesIs("hello")] | hello       => WaitForName,
+        @WaitForName        + NewMessage                  | name        => WaitForAge,
+        @WaitForAge         + NewMessage [is_number]      | age         => WaitForHello,
+
+        forall:             + Exit                        | ExitAction  => TerminationPseudoState,
     );
     let mes = sm.process(&()).unwrap();
     println!("{}", mes);

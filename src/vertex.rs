@@ -38,16 +38,46 @@ pub struct StateMachineVertex<IDX, SM, Entry, Exit> {
     pub(crate) phantom: PhantomData<IDX>,
 }
 
-impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit>
+impl<
+        IDX,
+        Current,
+        State,
+        Vertexes,
+        VertHandlers,
+        Transitions,
+        FAllTransitions,
+        Answer,
+        GErr,
+        Entry,
+        Exit,
+    >
     StateMachineVertex<
         IDX,
-        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
         Entry,
         Exit,
     >
 {
     pub fn new(
-        sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        sm: StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
         entry: Entry,
         exit: Exit,
     ) -> Self {
@@ -60,16 +90,34 @@ impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Ent
     }
 }
 
-impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
+impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, FAllTransitions, Answer, GErr>
     StateMachineVertex<
         IDX,
-        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
         EmptyVertex<()>,
         EmptyVertex<()>,
     >
 {
     pub fn empty(
-        sm: StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        sm: StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
     ) -> Self {
         StateMachineVertex {
             sm,
@@ -80,11 +128,31 @@ impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>
     }
 }
 
-impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit>
-    EntryVertex
+impl<
+        IDX,
+        Current,
+        State,
+        Vertexes,
+        VertHandlers,
+        Transitions,
+        FAllTransitions,
+        Answer,
+        GErr,
+        Entry,
+        Exit,
+    > EntryVertex
     for StateMachineVertex<
         IDX,
-        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
         Entry,
         Exit,
     >
@@ -96,10 +164,31 @@ where
     }
 }
 
-impl<IDX, Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr, Entry, Exit> ExitVertex
+impl<
+        IDX,
+        Current,
+        State,
+        Vertexes,
+        VertHandlers,
+        Transitions,
+        FAllTransitions,
+        Answer,
+        GErr,
+        Entry,
+        Exit,
+    > ExitVertex
     for StateMachineVertex<
         IDX,
-        StateMachine<Current, State, Vertexes, VertHandlers, Transitions, Answer, GErr>,
+        StateMachine<
+            Current,
+            State,
+            Vertexes,
+            VertHandlers,
+            Transitions,
+            FAllTransitions,
+            Answer,
+            GErr,
+        >,
         Entry,
         Exit,
     >
