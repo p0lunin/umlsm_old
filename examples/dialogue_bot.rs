@@ -46,10 +46,10 @@ struct NewMessage(String);
 struct Exit;
 
 // Actions
-fn start(_: &mut InitialPseudoState, _: &mut (), _: &(), _: &mut WaitForHello) -> String {
+fn start() -> String {
     "Hello! I am dialogue bot. Let's start! Say hello to me.".to_string()
 }
-fn hello(_: &mut WaitForHello, _: &mut (), _: &NewMessage, _: &mut WaitForName) -> String {
+fn hello() -> String {
     "Hello! How is your name?".to_string()
 }
 fn name(_: &mut WaitForName, _: &mut (), mes: &NewMessage, age: &mut WaitForAge) -> String {

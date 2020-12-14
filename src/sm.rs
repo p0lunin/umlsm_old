@@ -1,4 +1,4 @@
-use crate::action::{Action, ActionLoop};
+use crate::action::{Action, ActionLoop, FnIntoStruct};
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
 use crate::process_result::{ProcessResult, ProcessResultInner};
@@ -115,9 +115,9 @@ impl<
             phantom,
         }
     }
-    pub fn add_transition<A, G, S, E, Tar, AppendIdx, Out>(
+    pub fn add_transition<AInput, A, G, S, E, Tar, AppendIdx, Out>(
         self,
-        action: A,
+        action: AInput,
         guard: G,
         _target: PhantomData<Tar>,
     ) -> StateMachine<C, State, Vertexes, VertHandlers, HMap<Out>, FAllTransitions, Answer, GErr>
@@ -128,6 +128,7 @@ impl<
             AppendIdx,
             Out,
         >,
+        AInput: FnIntoStruct<A>,
         A: Action<S, State, E, Tar, Answer>,
         G: Guard<E, GErr>,
         S: 'static,
@@ -150,7 +151,7 @@ impl<
             state,
             vertexes,
             vertices_handlers,
-            transitions: transitions.append_inner(Transition::new(action, guard)),
+            transitions: transitions.append_inner(Transition::new(action.into(), guard)),
             forall_transitions,
             phantom,
         }

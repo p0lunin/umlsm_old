@@ -53,7 +53,7 @@ macro_rules! state_machine {
     ) => {
         $crate::StateMachine::<_, _, _, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex, $crate::state_machine!(parse_v_type, $($type)?)))*
-            $(.add_transition::<_, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
+            $(.add_transition::<_, _, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
                 $crate::state_machine!(parse_action, $source, $event, $($action)?),
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
