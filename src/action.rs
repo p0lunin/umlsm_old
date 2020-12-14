@@ -1,3 +1,5 @@
+//! Actions which called in `ITransition`.
+//!
 //! Actions - functions which will be called first when `ITransition` will be started. They can
 //! mutate states, do something job, and must return `Answer` which will be returning from
 //! `StateMachine` when event process will be ended.
@@ -116,6 +118,10 @@ mod wrappers;
 pub use {
     action::Action,
     action_loop::ActionLoop,
+};
+
+#[doc(hidden)]
+pub use {
     action_loop_wrappers::{EmptyActionLoop, EmptyForallAction},
     wrappers::{EmptyAction, FnIntoStruct},
 };

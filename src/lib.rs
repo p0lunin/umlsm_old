@@ -18,6 +18,7 @@ pub use {
     vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState},
 };
 
+#[doc(hidden)]
 pub mod reexport {
     pub use frunk;
 }
