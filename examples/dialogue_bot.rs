@@ -52,11 +52,11 @@ fn start() -> String {
 fn hello() -> String {
     "Hello! How is your name?".to_string()
 }
-fn name(_: &mut WaitForName, _: &mut (), mes: &NewMessage, age: &mut WaitForAge) -> String {
-    age.name = Some(mes.0.clone());
-    format!("Oh, your name is {}! How is your age?", mes.0)
+fn name(event: &NewMessage, target: &mut WaitForAge) -> String {
+    target.name = Some(event.0.clone());
+    format!("Oh, your name is {}! How is your age?", event.0)
 }
-fn age(state: &mut WaitForAge, _: &mut (), mes: &NewMessage, _: &mut WaitForHello) -> String {
+fn age(state: &mut WaitForAge,  mes: &NewMessage) -> String {
     let age: u32 = mes.0.parse().unwrap();
     format!(
         "Oh, your name is {} and age is {}!",
