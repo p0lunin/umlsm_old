@@ -41,7 +41,7 @@
 //! let mut sm = umlsm::state_machine!(
 //!     state = (), err = (),
 //!     [],
-//!     @InitialPseudoState + () | static_answer => TerminationPseudoState,
+//!     InitialPseudoState + () | static_answer => TerminationPseudoState;
 //! );
 //! let answer = sm.process(&()).unwrap();
 //! assert_eq!(answer, "Hello!");
@@ -90,9 +90,9 @@
 //!     state = (), err = (),
 //!     [State(0)],
 //!
-//!     @InitialPseudoState + ()        | start   => State,
-//!     @State              + ExitEvent | exit    => TerminationPseudoState,
-//!     loop: State         + ()        | process
+//!     InitialPseudoState + ()        | start   => State,
+//!     State              + ExitEvent | exit    => TerminationPseudoState;
+//!     loop: State        + ()        | process;
 //! );
 //! let answer = sm.process(&()).unwrap();
 //! assert_eq!(answer, "start");
