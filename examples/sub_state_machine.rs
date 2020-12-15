@@ -13,7 +13,8 @@ fn main() {
     let inner_sm: StateMachineVertex<InnerSmIdx, _, _, _> = StateMachineVertex::empty(umlsm::state_machine!(
         state = (), err = (),
         [],
-        @InitialPseudoState + MyEvent2 => TerminationPseudoState,
+
+        InitialPseudoState + MyEvent2 => TerminationPseudoState;
     ));
 
     #[rustfmt::skip]
@@ -21,8 +22,8 @@ fn main() {
         state = (), err = (),
         [@Sub inner_sm],
 
-        @InitialPseudoState                         + ()       => StateMachineVertex<InnerSmIdx, _, _, _>,
-        @(StateMachineVertex<InnerSmIdx, _, _, _>)  + MyEvent  => TerminationPseudoState,
+        InitialPseudoState                         + ()       => StateMachineVertex<InnerSmIdx, _, _, _>,
+        (StateMachineVertex<InnerSmIdx, _, _, _>)  + MyEvent  => TerminationPseudoState;
     );
     assert!(sm.is::<InitialPseudoState>());
 

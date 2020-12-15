@@ -1,5 +1,4 @@
 use crate::action::action::Action;
-use crate::action::ActionLoop;
 use std::marker::PhantomData;
 
 pub struct EmptyAction<Source, Event>(PhantomData<(Source, Event)>);

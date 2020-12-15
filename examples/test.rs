@@ -15,8 +15,8 @@ fn main() {
         state = (), err = String,
         [WaitForHello, WaitForName],
 
-        @InitialPseudoState + i32  => WaitForHello,
-        @WaitForHello       + ()   => WaitForName,
+        InitialPseudoState + i32  => WaitForHello,
+        WaitForHello       + ()   => WaitForName;
     );
     sm.process(&()).unwrap();
 }

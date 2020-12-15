@@ -85,12 +85,12 @@ fn main() {
         state = (), err = String,
         [WaitForHello, WaitForName, WaitForAge { name: None }],
 
-        @InitialPseudoState + ()                          | start       => WaitForHello,
-        @WaitForHello       + NewMessage [MesIs("hello")] | hello       => WaitForName,
-        @WaitForName        + NewMessage                  | name        => WaitForAge,
-        @WaitForAge         + NewMessage [is_number]      | age         => WaitForHello,
+        InitialPseudoState + ()                          | start       => WaitForHello,
+        WaitForHello       + NewMessage [MesIs("hello")] | hello       => WaitForName,
+        WaitForName        + NewMessage                  | name        => WaitForAge,
+        WaitForAge         + NewMessage [is_number]      | age         => WaitForHello;
 
-        forall:             + Exit                        | ExitAction  => TerminationPseudoState,
+        forall:             + Exit                        | ExitAction  => TerminationPseudoState;
     );
     let mes = sm.process(&()).unwrap();
     println!("{}", mes);

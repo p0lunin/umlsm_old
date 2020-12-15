@@ -26,8 +26,8 @@ pub mod reexport {
 #[macro_export]
 macro_rules! state_machine {
     (parse_source, _) => { _ };
-    (parse_source, $some:ty) => { $some };
     (parse_source, ($some:ty)) => { $some };
+    (parse_source, $some:ty) => { $some };
 
     (parse_action, $source:tt, $event:ty, ) => { $crate::action::EmptyAction::<$crate::state_machine!(parse_source, $source), $event>::new() };
     (parse_action, $source:tt, $event:ty,$action:expr) => { $action };
@@ -48,17 +48,17 @@ macro_rules! state_machine {
         state = $state:expr
         $(, err = $err:ty)?,
         [$($(@$type:ident)?$vertex:expr),*],
-        $(@$source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty,)*
-        $(forall: $(+ $event3:ty $([$($guard3:expr),*])? $(| $action3:expr)? => $target3:ty,)+)?
-        $(loop: $($source2:tt + $event2:ty $([$($guard2:expr),*])? $(| $action2:expr)?),*)?
+        $($($source:tt + $event:ty $([$($guard:expr),*])? $(| $action:expr)? => $target:ty),*;)?
+        $(forall: $(+ $event3:ty $([$($guard3:expr),*])? $(| $action3:expr)? => $target3:ty;)+)?
+        $(loop: $($source2:tt + $event2:ty $([$($guard2:expr),*])? $(| $action2:expr)?),*;)?
     ) => {
         $crate::StateMachine::<_, _, _, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex, $crate::state_machine!(parse_v_type, $($type)?)))*
-            $(.add_transition::<_, _, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
+            $($(.add_transition::<_, _, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
                 $crate::state_machine!(parse_action, $source, $event, $($action)?),
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
-            ))*
+            ))*)?
             $($(.add_transition_forall::<_, _, $event3, $target3>(
                 $crate::state_machine!(parse_action_forall, $event3, $($action3)?),
                 $crate::reexport::frunk::hlist![$($($guard3),*)?],
@@ -112,9 +112,9 @@ mod tests {
             state = (), err = (),
             [Locked {}, Unlocked {}],
 
-            @InitialPseudoState + ()   []        => Locked,
-            @Locked             + Push    | beep => Unlocked,
-            @Unlocked           + ()             => TerminationPseudoState,
+            InitialPseudoState + ()   []        => Locked,
+            Locked             + Push    | beep => Unlocked,
+            Unlocked           + ()             => TerminationPseudoState;
         );
 
         let mut sm = sm;
@@ -148,11 +148,11 @@ mod tests {
             state = (), err = (),
             [Looped],
 
-            @InitialPseudoState + ()               => Looped,
-            @Looped             + BEvent | b_event => TerminationPseudoState,
+            InitialPseudoState + ()               => Looped,
+            Looped             + BEvent | b_event => TerminationPseudoState;
 
             loop:
-            Looped              + AEvent | a_event
+            Looped              + AEvent | a_event;
         );
 
         sm.process(&()).unwrap();
@@ -165,61 +165,5 @@ mod tests {
 
         sm.process(&BEvent).unwrap();
         assert!(sm.is::<TerminationPseudoState>());
-    }
-
-    mod compile_test {
-        use crate::transition::{ForallTransition, ITransition, ProcessByForallTransitions};
-        use crate::{Action, InitialPseudoState, TerminationPseudoState};
-        use frunk::coproduct::CNil;
-        use frunk::{Coproduct, HCons, HNil};
-        use std::marker::PhantomData;
-
-        struct Action1;
-        impl<S> Action<S, (), i32, TerminationPseudoState, ()> for Action1 {
-            fn trigger(
-                &self,
-                source: &mut S,
-                ctx: &mut (),
-                event: &i32,
-                target: &mut TerminationPseudoState,
-            ) -> () {
-            }
-        }
-        fn compile_test_forall_transition() {
-            type V = HCons<InitialPseudoState, HCons<TerminationPseudoState, HNil>>;
-            type C = Coproduct<
-                PhantomData<InitialPseudoState>,
-                Coproduct<PhantomData<TerminationPseudoState>, CNil>,
-            >;
-            type F = HCons<(ForallTransition<Action1, HNil>, PhantomData<Action1>), HNil>;
-
-            let v: V = unimplemented!();
-            let f: ForallTransition<Action1, HNil> = unimplemented!();
-            ITransition::<_, _, _, _, _, _, (), _>::process(
-                &mut f,
-                &mut PhantomData::<InitialPseudoState>,
-                &mut (),
-                &(),
-                &mut v,
-            );
-
-            let f: F = unimplemented!();
-            ITransition::<_, _, _, C, _, (), (), _>::process(
-                &mut f,
-                &mut PhantomData::<InitialPseudoState>,
-                &mut (),
-                &(),
-                &mut v,
-            );
-
-            let c: C = unimplemented!();
-            ProcessByForallTransitions::<_, _, _, _, _, C, (), _>::process_by(
-                &mut c,
-                &mut f,
-                &mut (),
-                &(),
-                &mut v,
-            );
-        }
     }
 }
