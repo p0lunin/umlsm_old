@@ -72,6 +72,7 @@
 //! Simple answer:
 //! ```
 //! use umlsm::*;
+//! use umlsm::vertex::{EntryVertex, ExitVertex};
 //!
 //! struct State(u32);
 //! impl EntryVertex for State {}
@@ -103,7 +104,7 @@
 //! let answer = sm.process(&()).unwrap();
 //! assert_eq!(answer, "loop");
 //!
-//! assert_eq!(sm.get_current_as::<State, _>().unwrap().0, 3);
+//! assert_eq!(sm.get_vertex::<State, _>().0, 3);
 //!
 //! let answer = sm.process(&ExitEvent).unwrap();
 //! assert_eq!(answer, "exit");
@@ -115,10 +116,7 @@ mod action_loop;
 mod action_loop_wrappers;
 mod wrappers;
 
-pub use {
-    action::Action,
-    action_loop::ActionLoop,
-};
+pub use {action::Action, action_loop::ActionLoop};
 
 #[doc(hidden)]
 pub use {

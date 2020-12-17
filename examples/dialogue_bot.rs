@@ -1,7 +1,5 @@
-use umlsm::{
-    Action, CurrentStateIs, EntryVertex, ExitVertex, Guard, InitialPseudoState, ProcessEvent,
-    ProcessResult, TerminationPseudoState,
-};
+use umlsm::vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState};
+use umlsm::{Action, CurrentStateIs, Guard, ProcessEvent, ProcessResult};
 
 // Vertexes
 
@@ -56,7 +54,7 @@ fn name(event: &NewMessage, target: &mut WaitForAge) -> String {
     target.name = Some(event.0.clone());
     format!("Oh, your name is {}! How is your age?", event.0)
 }
-fn age(state: &mut WaitForAge,  mes: &NewMessage) -> String {
+fn age(state: &mut WaitForAge, mes: &NewMessage) -> String {
     let age: u32 = mes.0.parse().unwrap();
     format!(
         "Oh, your name is {} and age is {}!",

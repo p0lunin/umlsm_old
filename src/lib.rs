@@ -4,7 +4,7 @@ mod hmap;
 mod process_event;
 pub mod process_result;
 mod sm;
-mod transition;
+pub mod transition;
 mod utils;
 pub mod vert_handler;
 pub mod vertex;
@@ -15,7 +15,6 @@ pub use {
     process_event::ProcessEvent,
     process_result::ProcessResult,
     sm::{CurrentStateIs, StateMachine},
-    vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState},
 };
 
 #[doc(hidden)]
@@ -54,7 +53,7 @@ macro_rules! state_machine {
     ) => {
         $crate::StateMachine::<_, _, _, _, _, _, _, $crate::state_machine!(parse_err, $($err)?)>::new($state)
             $(.add_vertex($vertex, $crate::state_machine!(parse_v_type, $($type)?)))*
-            $($(.add_transition::<_, _, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _>(
+            $($(.add_transition::<_, _, _, $crate::state_machine!(parse_source, $source), $event, $target, _, _, _>(
                 $crate::state_machine!(parse_action, $source, $event, $($action)?),
                 $crate::reexport::frunk::hlist![$($($guard),*)?],
                 std::marker::PhantomData,
@@ -74,8 +73,8 @@ macro_rules! state_machine {
 #[cfg(test)]
 mod tests {
     use crate::sm::CurrentStateIs;
-    use crate::vertex::{InitialPseudoState, TerminationPseudoState};
-    use crate::{EntryVertex, ExitVertex, ProcessEvent};
+    use crate::vertex::{EntryVertex, ExitVertex, InitialPseudoState, TerminationPseudoState};
+    use crate::ProcessEvent;
 
     struct Locked;
     impl EntryVertex for Locked {

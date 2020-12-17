@@ -1,5 +1,6 @@
-use crate::vertex::StateMachineVertex;
-use crate::{CurrentStateIs, ProcessEvent, TerminationPseudoState};
+use crate::process_result::ProcessResultSubstate;
+use crate::vertex::{StateMachineVertex, TerminationPseudoState};
+use crate::{CurrentStateIs, ProcessEvent};
 use frunk::coproduct::{CNil, CoproductSelector};
 use frunk::{Coproduct, HCons, HNil};
 use std::marker::PhantomData;
@@ -11,13 +12,6 @@ pub trait VertexHandler<Vertex, Idx, Event, Answer, GErr, Other> {
         idx: &Idx,
         event: &Event,
     ) -> ProcessResultSubstate<Answer, GErr>;
-}
-
-pub enum ProcessResultSubstate<Answer, GErr> {
-    Handled(Answer),
-    NoTransitions,
-    GuardErr(GErr),
-    MustLeaveState,
 }
 
 pub struct EmptyVertexHandler;

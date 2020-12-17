@@ -1,7 +1,5 @@
-use umlsm::{
-    vertex::StateMachineVertex, CurrentStateIs, InitialPseudoState, ProcessEvent,
-    TerminationPseudoState,
-};
+use umlsm::vertex::{InitialPseudoState, TerminationPseudoState};
+use umlsm::{vertex::StateMachineVertex, CurrentStateIs, ProcessEvent};
 
 struct MyEvent;
 struct MyEvent2;

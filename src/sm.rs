@@ -1,20 +1,37 @@
+//! Main struct that encapsulates states and transitions.
+//!
+//! `StateMachine` store itself:
+//! - Current vertex.
+//! - Global mutable state.
+//! - Array of vertices.
+//! - Array of transitions.
+//!
+//! By default, `StateMachine::new` creates an empty state machine with 2 vertices:
+//! - `InitialPseudoState`
+//! - `TerminationPseudoState`
+//!
+//! For initializing the `StateMachine` we recommend use the `state_machine!` macro.
+
 use crate::action::{Action, ActionLoop, FnIntoStruct};
 use crate::guard::Guard;
 use crate::hmap::{AppendInner, HMap, HMapNil};
-use crate::process_result::{ProcessResult, ProcessResultInner};
+use crate::process_result::{ProcessResult, ProcessResultInner, ProcessResultSubstate};
 use crate::transition::{
     ForallTransition, ITransition, LoopTransition, ProcessByForallTransitions, Transition,
 };
 use crate::utils::{CoprodWithRef, CoprodWithoutPhantomData, GetRefsFromCoprod};
-use crate::vert_handler::{EmptyVertexHandler, ProcessResultSubstate, VertexHandler};
+use crate::vert_handler::{EmptyVertexHandler, VertexHandler};
 use crate::vertex::{InitialPseudoState, TerminationPseudoState};
 use crate::ProcessEvent;
 use frunk::coproduct::{CNil, CoproductEmbedder, CoproductSelector};
-use frunk::hlist::{h_cons, HList};
+use frunk::hlist::{h_cons, HList, Selector};
 use frunk::{Coproduct, HCons, HNil};
 use std::any::TypeId;
 use std::marker::PhantomData;
 
+/// Main struct that encapsulates states and transitions.
+///
+/// For more information see `module-level documentation`.
 pub struct StateMachine<
     Current,
     State,
@@ -54,6 +71,7 @@ impl<State, Answer, GErr>
         GErr,
     >
 {
+    /// Initialize an empty state machine with specified global state.
     pub fn new(state: State) -> Self {
         Self {
             current: Coproduct::inject(PhantomData::<InitialPseudoState>),
@@ -79,6 +97,10 @@ impl<
     >
     StateMachine<C, State, Vertexes, VertHandlers, HMap<Transitions>, FAllTransitions, Answer, GErr>
 {
+    /// Add an `Vertex` for state machine with specified handler.
+    ///
+    /// More about vertices see in `umlsm::vertex` module.
+    /// More about vertex handlers see in `umlsm::vert_handler` module.
     pub fn add_vertex<V, VertHandler, Inds>(
         self,
         vertex: V,
@@ -115,13 +137,18 @@ impl<
             phantom,
         }
     }
-    pub fn add_transition<AInput, A, G, S, E, Tar, AppendIdx, Out>(
+    /// Add a transition between `Source` and `Target` vertex with specified `Action` and `Guard`.
+    ///
+    /// More about actions see in `umlsm::action` module.
+    /// More about guards see in `umlsm::guard` module.
+    pub fn add_transition<AInput, A, G, S, E, Tar, AppendIdx, Idx, Out>(
         self,
         action: AInput,
         guard: G,
         _target: PhantomData<Tar>,
     ) -> StateMachine<C, State, Vertexes, VertHandlers, HMap<Out>, FAllTransitions, Answer, GErr>
     where
+        Vertexes: Selector<S, Idx>,
         Transitions: AppendInner<
             PhantomData<S>,
             Transition<S, State, E, A, G, Tar, Answer, GErr>,
@@ -156,6 +183,11 @@ impl<
             phantom,
         }
     }
+    /// Add a transition between all vertices in state machine (except `Target` vertex) and `Target`
+    /// vertex with specified `Action` and `Guard`.
+    ///
+    /// More about actions see in `umlsm::action` module.
+    /// More about guards see in `umlsm::guard` module.
     pub fn add_transition_forall<A, G, E, Tar>(
         self,
         action: A,
@@ -194,6 +226,7 @@ impl<
             phantom,
         }
     }
+    /// Add an loop for specified `Vertex` with `Action` and `Guard`.
     pub fn add_loop<A, G, Vertex, E, AppendIdx, Out>(
         self,
         action: A,
@@ -230,7 +263,9 @@ impl<
     }
 }
 
+/// An interface for checking current vertex of machine.
 pub trait CurrentStateIs<Idx, Inner> {
+    /// Check that current state of state machine is `T`
     fn is<T>(&self) -> bool
     where
         Inner: CoproductSelector<PhantomData<T>, Idx>;
@@ -279,6 +314,14 @@ impl<C, State, Vertexes, VertHandlers, Transitions, FAllTransitions, Answer, GEr
             CoproductSelector<&'a T, Idx>,
     {
         self.get_current().get().map(|&u| u)
+    }
+
+    /// Get specified vertex.
+    pub fn get_vertex<'a, T, Idx>(&'a self) -> &'a T
+    where
+        Vertexes: Selector<T, Idx>,
+    {
+        self.vertexes.get()
     }
 }
 

@@ -1,3 +1,11 @@
+//! Results that are returned from different interfaces.
+
+/// An result of processing event.
+///
+/// - `Handled` - event handled and `Answer` is returned.
+/// - `NoTransitions` - event not handled because there are no transitions from this `Source` vertex
+/// that give a specified `Event` type.
+/// - `GuardErr` - event not handled because `Guard` not accept it and guard error returns.
 pub enum ProcessResult<Answer, GErr> {
     Handled(Answer),
     NoTransitions,
@@ -31,6 +39,15 @@ impl<Answer, GErr> ProcessResult<Answer, GErr> {
     }
 }
 
+/// An inner result of processing event. It is need only if you implement your own `ITransition`.
+///
+/// - `HandledAndProcessNext` - event handled, but answer is not returned because there are required
+/// at least one more step int `StateMachine`.
+/// - `EventTypeNotSatisfy` - event type that received not satisfy for type of `ITransition`.
+/// - `HandledAndProcessEnd` - event handled and `Answer` is returned.
+/// - `NoTransitions` - event not handled because there are no transitions from this `Source` vertex
+/// that give a specified `Event` type.
+/// - `GuardErr` - event not handled because `Guard` not accept it and guard error returns.
 pub enum ProcessResultInner<Answer, GErr> {
     HandledAndProcessNext,
     EventTypeNotSatisfy,
@@ -66,4 +83,18 @@ impl<A, GErr> ProcessResultInner<A, GErr> {
             EventTypeNotSatisfy => ProcessResultInner::EventTypeNotSatisfy,
         }
     }
+}
+
+/// An inner result of processing event by substate.
+///
+/// - `Handled` - event handled and `Answer` is returned.
+/// - `NoTransitions` - event not handled because there are no transitions from this `Source` vertex
+/// that give a specified `Event` type.
+/// - `GuardErr` - event not handled because `Guard` not accept it and guard error returns.
+/// - `MustLeaveState` - state machine must leave substate and make transition to another vertex.
+pub enum ProcessResultSubstate<Answer, GErr> {
+    Handled(Answer),
+    NoTransitions,
+    GuardErr(GErr),
+    MustLeaveState,
 }
